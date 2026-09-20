@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+*.log
+
+# 検証用に一時生成するモック（コミットしない）
+frontend/__mock.js

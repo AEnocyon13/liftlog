@@ -1,0 +1,131 @@
+# セットアップ & デプロイ手順
+
+所要 15〜20分。上から順に実行してください。
+
+---
+
+## 1. スプレッドシートを作る（実績DB）
+
+1. [sheets.new](https://sheets.new) で新規スプレッドシートを作成し、名前を「筋トレ記録」などにする。
+2. URL の `https://docs.google.com/spreadsheets/d/【ここがID】/edit` から **スプレッドシートID** を控える。
+
+シート（タブ）は後述の `setupSpreadsheet()` が自動で作るので、手作業では作らなくて構いません。
+列の意味は [SPREADSHEET_SCHEMA.md](SPREADSHEET_SCHEMA.md) を参照。
+
+## 2. Googleドキュメントを作る（解説マスター）
+
+1. [docs.new](https://docs.new) で新規ドキュメントを作成し、名前を「筋トレ メニュー解説」などにする。
+2. URL の `https://docs.google.com/document/d/【ここがID】/edit` から **ドキュメントID** を控える。
+
+記述ルールは [DOC_FORMAT.md](DOC_FORMAT.md)。手順6で雛形を自動生成できます。
+
+## 3. Apps Script プロジェクトを作る
+
+1. [script.new](https://script.new) で新規プロジェクトを作成し、名前を「LiftLog API」にする。
+2. 左の歯車（プロジェクトの設定）→ **「appsscript.json マニフェスト ファイルをエディタで表示する」にチェック**。
+3. エディタ左の「ファイル」で、`backend/` の各ファイルを同じ名前で作成し、中身を貼り付ける。
+   - `appsscript.json`（既存ファイルを上書き）
+   - `Config.gs` / `Code.gs` / `SheetRepo.gs` / `DocRepo.gs` / `Progression.gs` / `Dashboard.gs` / `Setup.gs`
+   - ※ エディタ上では拡張子 `.gs` は省略表示されます。新規作成時は「スクリプト」を選んでください。
+
+> `clasp` を使う場合：`clasp create --type webapp` 後に `backend/` の中身を `clasp push` でも構いません。
+
+## 4. スクリプトプロパティを設定する
+
+プロジェクトの設定 → 「スクリプト プロパティ」→ 以下3つを追加。
+
+| プロパティ | 値 |
+|---|---|
+| `SPREADSHEET_ID` | 手順1で控えたID |
+| `DOC_ID` | 手順2で控えたID |
+| `API_KEY` | 手順5で自動生成するので、いったん空でもよい |
+
+## 5. APIキーを生成する
+
+エディタ上部の関数プルダウンで `generateApiKey` を選び ▶ 実行。
+初回は権限の承認ダイアログが出ます（自分のGoogleアカウントを選択 →「詳細」→「安全ではないページに移動」→ 許可）。
+
+承認を求められるのは、`appsscript.json` で宣言している2つのスコープです。
+
+| スコープ | 用途 |
+|---|---|
+| `.../auth/spreadsheets` | 実績シートの読み書き |
+| `.../auth/documents` | 解説ドキュメントの読み取りと雛形書き込み |
+
+> **`documents.readonly` では動きません。** Apps Script の `DocumentApp` には読み取り専用で開くメソッドが無く、
+> `DocumentApp.openById()` は参照だけでもフルの `documents` スコープを要求します。
+> `appsscript.json` を書き換えた場合は、次の手動実行時に承認ダイアログが再表示されます（そこで再度許可してください）。
+
+実行ログに表示された32文字の値が **APIキー** です。控えておいてください（スクリプトプロパティにも自動保存されます）。
+
+## 6. シートとドキュメントを初期化する
+
+関数プルダウンから、順に ▶ 実行します。
+
+| 関数 | 内容 |
+|---|---|
+| `setupSpreadsheet` | Logs / Sessions / Menus / Settings の4シートとヘッダを作成し、初期メニュー16種と既定設定を投入 |
+| `seedGuideDocTemplate` | 解説ドキュメントに雛形（胸・背中のサンプル）を書き込む ※本文が空のときのみ |
+| `selfTest` | 読み書きが通るか確認。ログにメニュー数・解説数・提案結果が出れば成功 |
+| `testProgression` | 重量提案アルゴリズムの分岐をシート無しで確認（任意） |
+
+## 7. ウェブアプリとしてデプロイする
+
+1. 右上「デプロイ」→「新しいデプロイ」→ 種類の選択（歯車）→ **ウェブアプリ**。
+2. 設定：
+   - 説明：`v1`
+   - **次のユーザーとして実行：自分**
+   - **アクセスできるユーザー：全員**
+     （「全員」でないとブラウザから叩けません。APIキーで保護しているため、URLが漏れなければ第三者は操作できません）
+3. デプロイ → 表示される **ウェブアプリURL**（`https://script.google.com/macros/s/.../exec`）を控える。
+
+> **コードを更新したとき**：「デプロイ」→「デプロイを管理」→ 対象の鉛筆アイコン →
+> バージョンを「新バージョン」にして「デプロイ」。**URLは変わりません**。
+> 「新しいデプロイ」を選ぶと別URLになるので注意。
+
+## 8. フロントエンドを配置する
+
+### GitHub Pages（このリポジトリの既定）
+
+`.github/workflows/pages.yml` が設定済みで、**main に push すると `frontend/` だけが自動でデプロイ**されます。
+`backend/`（GASのソース）と `docs/` は Web には公開されません。
+
+- 公開URL: https://aenocyon13.github.io/liftlog/
+- リポジトリの Settings → Pages → Source が **GitHub Actions** になっている必要があります
+- ビルド作業は不要です（依存パッケージなし・ES Modules をそのまま配信）
+
+フォークして使う場合も、Settings → Pages → Source を GitHub Actions にすればそのまま動きます。
+
+### ローカルで試す場合
+
+```bash
+cd workout-app/frontend && python3 -m http.server 4399
+```
+
+`http://localhost:4399` を開きます（`file://` 直開きはES Modulesが動かないため不可）。
+
+## 9. アプリから接続する
+
+1. 公開したページを開く → 自動で「設定」画面が開きます。
+2. **GAS ウェブアプリ URL**（手順7）と **API キー**（手順5）を入力 →「保存して接続」。
+3. 「接続済み」と表示されれば完了。ホームの「ワークアウト開始」から使えます。
+
+> 設定はそのブラウザの localStorage にのみ保存されます。スマホとPCの両方で使う場合は、それぞれで入力してください。
+> スマホは「ホーム画面に追加」しておくと全画面で起動できます。
+
+---
+
+## トラブルシューティング
+
+| 症状 | 原因と対処 |
+|---|---|
+| 「APIから予期しない応答が返りました」 | デプロイの「アクセスできるユーザー」が「全員」になっていない。または URL が `/dev` になっている（`/exec` を使う） |
+| 「APIキーが一致しません」 | 設定画面のキーと `API_KEY` プロパティの不一致。`generateApiKey` を再実行して両方を更新 |
+| 「シート「Logs」がありません」 | `setupSpreadsheet()` が未実行 |
+| 「スクリプトプロパティ DOC_ID が未設定です」 | 手順4の設定漏れ |
+| `Exception: 権限が不十分です … Required permission: https://www.googleapis.com/auth/documents` | `appsscript.json` の `oauthScopes` が `documents.readonly` になっている。`documents`（フル）に直して保存し、対象の関数をもう一度手動実行して承認ダイアログを許可する。デプロイ済みの場合は「デプロイを管理」から新バージョンで再デプロイも必要 |
+| スコープを直したのに同じエラーが出る | マニフェストの保存漏れ、または承認ダイアログを許可していない。プロジェクトの設定で「appsscript.json をエディタで表示する」がONか確認し、Ctrl/Cmd+S で保存してから再実行 |
+| 解説が出ない | ドキュメントの見出しレベルが「見出し1＝部位／見出し2＝種目名」になっているか確認。編集後は設定画面の「解説ドキュメントを再読込」（10分キャッシュ） |
+| メニューを追加したのに出ない | Menus シートの `active` 列が `TRUE` か確認 → 設定画面の「メニュー・設定を再読込」 |
+| 記録した日付が1日ずれる | スプレッドシートの ファイル→設定→タイムゾーンと、`appsscript.json` の `timeZone` を `Asia/Tokyo` に揃える |
+| CORSエラーがコンソールに出る | POSTのContent-Typeを `text/plain` から変えていないか確認（`api.js`） |
