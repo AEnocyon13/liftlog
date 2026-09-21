@@ -105,6 +105,9 @@ Webフォントが落ちた場合はシステムのサンセリフにフォー�
 | Switch | `.md-switch` | （予備） |
 | Bottom sheet / Dialog | `.md-sheet` / `.md-dialog__*` | 種目解説、確認ダイアログ |
 | Snackbar | `.md-snackbar` | 保存完了・エラー通知 |
+| Text field (ログイン) | `.ll-login` | 苗字の入力。中央寄せ・字間を広げた1フィールド構成 |
+| 休憩タイマー | `.ll-rest` | 実行中はトップアプリバー直下に sticky で固定。作動中は primary の枠線、終了時は primary-container に反転して点滅 |
+| 今回のプラン | `.ll-plan` | セットごとの「重量 × レップ」。前回値を右端に添える |
 | Divider | `.md-divider` | カード内の区切り |
 
 アプリ固有の組み合わせ（統計タイル、提案カード、セット入力グリッド、カレンダー）は

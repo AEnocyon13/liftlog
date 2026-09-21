@@ -1,23 +1,74 @@
-/** state.js — アプリ状態と、進行中ワークアウトの下書き保存 */
+/** state.js — アプリ状態、ログイン中ユーザー、進行中ワークアウトの下書き保存 */
 
 const LS_DRAFT = 'liftlog.draft';
+const LS_USER  = 'liftlog.user';
+const LS_REST  = 'liftlog.restMinutes';
 
 export const state = {
+  user: null,          // { surname, monthlyTargetWorkouts, weightIncrement, restMinutes, ... }
   menus: [],
   guides: [],
   settings: {},
   dashboard: null,
   serverOpenSession: null,
-  /** 部位選択画面の一時選択 */
   picking: { part: null, selected: [] },
-  /** 進行中のワークアウト（localStorage に自動保存） */
   draft: null
 };
+
+/* ---------- ログイン中の苗字 ---------- */
+
+export function getUser() {
+  try { return localStorage.getItem(LS_USER) || null; } catch { return null; }
+}
+
+export function setUser(surname) {
+  try {
+    if (surname) localStorage.setItem(LS_USER, surname);
+    else localStorage.removeItem(LS_USER);
+  } catch { /* プライベートモード等 */ }
+}
+
+/** ログアウト。下書きも破棄する（別ユーザーの記録に混ざらないように） */
+export function logout() {
+  setUser(null);
+  state.user = null;
+  state.dashboard = null;
+  clearDraft();
+  state.picking = { part: null, selected: [] };
+}
+
+/** 苗字のバリデーション（サーバー側 SURNAME_RE と同じ規則） */
+export const SURNAME_RE = /^[a-z]{1,20}$/;
+
+export function normalizeSurname(raw) {
+  return String(raw ?? '')
+    .replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s　]/g, '')
+    .toLowerCase();
+}
+
+/* ---------- 休憩時間（分）の引き継ぎ ---------- */
+
+export function getRestMinutes() {
+  const fromUser = Number(state.user?.restMinutes);
+  if (isFinite(fromUser) && fromUser > 0) return fromUser;
+  const stored = Number(localStorage.getItem(LS_REST));
+  return isFinite(stored) && stored > 0 ? stored : 3;
+}
+
+export function rememberRestMinutes(min) {
+  try { localStorage.setItem(LS_REST, String(min)); } catch { /* noop */ }
+  if (state.user) state.user.restMinutes = min;
+}
+
+/* ---------- 進行中ワークアウト ---------- */
 
 export function loadDraft() {
   try {
     const raw = localStorage.getItem(LS_DRAFT);
-    state.draft = raw ? JSON.parse(raw) : null;
+    const d = raw ? JSON.parse(raw) : null;
+    // 別のユーザーでログインし直したときの取り違えを防ぐ
+    state.draft = (d && d.owner && d.owner !== getUser()) ? null : d;
   } catch {
     state.draft = null;
   }
@@ -36,14 +87,15 @@ export function clearDraft() {
 
 export function newDraft(selection) {
   state.draft = {
+    owner: getUser(),
     sessionId: null,
     startTime: null,
     date: null,
     status: 'planning',           // planning -> confirming -> active
-    selection,                    // [{part, menu}]
-    entries: [],                  // 確定後に作られる
-    condition: '',
-    memo: ''
+    selection,
+    entries: [],
+    memo: '',
+    rest: { minutes: getRestMinutes(), endsAt: null }
   };
   saveDraft();
   return state.draft;
@@ -60,7 +112,6 @@ export const menuConfig = (part, menu) =>
 
 const norm = (s) => String(s || '').replace(/[\s　（）()]/g, '').toLowerCase();
 
-/** 解説ドキュメントから該当種目を探す（部位一致 → 種目名/別名の正規化一致） */
 export function guideFor(part, menu) {
   const nm = norm(menu), np = norm(part);
   return (

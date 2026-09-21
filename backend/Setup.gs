@@ -2,10 +2,13 @@
  * Setup.gs — 初期セットアップ用のユーティリティ
  *
  * 使い方（GASエディタから1回ずつ実行）:
- *   1. generateApiKey()        … APIキーを生成してスクリプトプロパティに保存＋ログ表示
- *   2. setupSpreadsheet()      … 4つのシートとヘッダ、初期メニュー、初期設定を作成
- *   3. seedGuideDocTemplate()  … 解説用ドキュメントに雛形を書き込む（空のときのみ）
- *   4. selfTest()              … 一通りの読み書きが通るか確認
+ *   1. generateApiKey()     … APIキーを生成してスクリプトプロパティに保存＋ログ表示
+ *   2. setupSpreadsheet()   … Users / Menus / Settings を作成し、種目46件を投入
+ *   3. seedGuideDoc()       … 解説ドキュメントに Notion 由来の内容を書き込む
+ *   4. selfTest()           … 一通りの読み書きが通るか確認
+ *
+ * 旧バージョン（ユーザー分割前）から移行する場合:
+ *   migrateLegacyData('yamada') … 既存の Logs / Sessions を指定ユーザーのシートへ移す
  */
 
 function generateApiKey() {
@@ -17,21 +20,17 @@ function generateApiKey() {
 
 function setupSpreadsheet() {
   var ss = getSpreadsheet_();
-  ensureSheet_(ss, SHEETS.LOGS, LOG_COLUMNS);
-  ensureSheet_(ss, SHEETS.SESSIONS, SESSION_COLUMNS);
+  ensureSheet_(ss, SHEETS.USERS, USER_COLUMNS);
   ensureSheet_(ss, SHEETS.MENUS, MENU_COLUMNS);
   ensureSheet_(ss, SHEETS.SETTINGS, ['key', 'value', 'description']);
 
   seedSettings_(ss);
   seedMenus_(ss);
 
-  // 日付列をテキスト扱いにして 'yyyy-MM-dd' が壊れないようにする
-  formatDateColumnAsText_(ss.getSheetByName(SHEETS.LOGS), LOG_COLUMNS.indexOf('date') + 1);
-  formatDateColumnAsText_(ss.getSheetByName(SHEETS.SESSIONS), SESSION_COLUMNS.indexOf('date') + 1);
-
   _settingsCache = null;
   _menuCache = null;
-  Logger.log('セットアップ完了: ' + ss.getName() + '\n' + ss.getUrl());
+  Logger.log('セットアップ完了: ' + ss.getName() + '\n' + ss.getUrl() +
+    '\n\n実績シート（Logs_<姓> / Sessions_<姓>）は、アプリで苗字を登録したときに自動生成されます。');
 }
 
 function ensureSheet_(ss, name, columns) {
@@ -39,13 +38,9 @@ function ensureSheet_(ss, name, columns) {
   if (!sh) sh = ss.insertSheet(name);
   var existing = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0]
     .map(function (v) { return String(v).trim(); }).filter(String);
-  if (existing.length === 0) {
-    sh.getRange(1, 1, 1, columns.length).setValues([columns]);
-  }
+  if (existing.length === 0) sh.getRange(1, 1, 1, columns.length).setValues([columns]);
   sh.getRange(1, 1, 1, columns.length)
-    .setFontWeight('bold')
-    .setBackground('#1f2937')
-    .setFontColor('#ffffff');
+    .setFontWeight('bold').setBackground('#013E37').setFontColor('#FFEFB3');
   sh.setFrozenRows(1);
   sh.autoResizeColumns(1, columns.length);
   return sh;
@@ -60,16 +55,11 @@ function seedSettings_(ss) {
   var sh = ss.getSheetByName(SHEETS.SETTINGS);
   if (sh.getLastRow() > 1) return;
   var descriptions = {
-    monthlyTargetWorkouts: '月間の目標ワークアウト回数（ダッシュボードの達成率の分母）',
-    monthlyTargetVolume: '月間の目標総ボリューム(kg)。0なら非表示',
-    deloadRate: '連続失敗時に落とす割合（0.10 = 10%減）',
-    deloadAfterFails: '何回連続で下限レップ未達ならディロードするか',
-    defaultRepMin: 'Menus に指定が無い場合の目標レップ下限',
-    defaultRepMax: 'Menus に指定が無い場合の目標レップ上限',
-    defaultWeightStep: 'Menus に指定が無い場合の重量刻み(kg)',
-    rpeEasyThreshold: 'この値以下のRPEなら増加幅 x1.5',
-    rpeNormalThreshold: 'この値以下のRPEなら増加幅 x1.0',
-    rpeHardThreshold: 'この値以下のRPEなら増加幅 x0.5 / 超えたら据え置き',
+    defaultRepMin: '履歴が無い種目で表示する目標レップ下限',
+    defaultRepMax: '同上・上限',
+    defaultWeightIncrement: '前回比で自動的に足す重量(kg)。個人設定で上書きできる',
+    defaultRestMinutes: '休憩タイマーの既定値(分)。個人設定で上書きできる',
+    defaultMonthlyTarget: '月間目標ワークアウト回数の既定。個人設定で上書きできる',
     timezone: 'タイムゾーン'
   };
   var rows = Object.keys(DEFAULT_SETTINGS).map(function (k) {
@@ -78,95 +68,79 @@ function seedSettings_(ss) {
   sh.getRange(2, 1, rows.length, 3).setValues(rows);
 }
 
-/** 初期メニュー（山岸秀匡選手の分割を意識した基本種目セット） */
+/** 種目マスター（SeedData.gs / Notion「筋トre」由来の46種目） */
 function seedMenus_(ss) {
   var sh = ss.getSheetByName(SHEETS.MENUS);
-  if (sh.getLastRow() > 1) return;
-  // part, menu, equipment, repMin, repMax, baseIncrement, weightStep, defaultSets, order, active
-  var rows = [
-    ['胸', 'ベンチプレス', 'バーベル', 8, 12, 2.5, 2.5, 4, 1, true],
-    ['胸', 'インクラインダンベルプレス', 'ダンベル', 8, 12, 2, 2, 3, 2, true],
-    ['胸', 'ケーブルフライ', 'ケーブル', 12, 15, 2.5, 2.5, 3, 3, true],
-    ['背中', 'デッドリフト', 'バーベル', 5, 8, 5, 2.5, 3, 1, true],
-    ['背中', 'ラットプルダウン', 'マシン', 8, 12, 2.5, 2.5, 4, 2, true],
-    ['背中', 'ベントオーバーロウ', 'バーベル', 8, 12, 2.5, 2.5, 3, 3, true],
-    ['脚', 'バーベルスクワット', 'バーベル', 8, 12, 5, 2.5, 4, 1, true],
-    ['脚', 'レッグプレス', 'マシン', 10, 15, 10, 5, 3, 2, true],
-    ['脚', 'レッグエクステンション', 'マシン', 12, 15, 5, 2.5, 3, 3, true],
-    ['脚', 'ライイングレッグカール', 'マシン', 10, 15, 5, 2.5, 3, 4, true],
-    ['肩', 'ショルダープレス', 'ダンベル', 8, 12, 2, 2, 4, 1, true],
-    ['肩', 'サイドレイズ', 'ダンベル', 12, 15, 1, 1, 4, 2, true],
-    ['肩', 'リアデルトフライ', 'マシン', 12, 15, 2.5, 2.5, 3, 3, true],
-    ['腕', 'バーベルカール', 'バーベル', 8, 12, 2.5, 1.25, 3, 1, true],
-    ['腕', 'ケーブルプレスダウン', 'ケーブル', 10, 15, 2.5, 2.5, 3, 2, true],
-    ['腕', 'インクラインダンベルカール', 'ダンベル', 10, 12, 1, 1, 3, 3, true]
-  ];
-  sh.getRange(2, 1, rows.length, MENU_COLUMNS.length).setValues(rows);
+  if (sh.getLastRow() > 1) {
+    Logger.log('Menus シートに既にデータがあるため、種目の投入をスキップしました。' +
+      '入れ直す場合は Menus シートの2行目以降を削除してから再実行してください。');
+    return;
+  }
+  sh.getRange(2, 1, SEED_MENUS.length, MENU_COLUMNS.length).setValues(SEED_MENUS);
+  Logger.log('種目を ' + SEED_MENUS.length + ' 件投入しました。');
 }
 
-/** 解説ドキュメントの雛形を書き込む（本文が空のときのみ） */
-function seedGuideDocTemplate() {
+/**
+ * 解説ドキュメントに SEED_GUIDE の内容を書き込む。
+ * 既に本文があるときは何もしない（手で書いた内容を消さないため）。
+ */
+function seedGuideDoc() {
   var doc = getDoc_();
   var body = doc.getBody();
   if (body.getText().trim().length > 0) {
-    Logger.log('ドキュメントに既に内容があるため、雛形の書き込みをスキップしました。');
+    Logger.log('ドキュメントに既に内容があるため、書き込みをスキップしました。\n' +
+      '入れ直す場合はドキュメントの中身を全て削除してから再実行してください。');
     return;
   }
 
-  var title = body.appendParagraph('筋トレ メニュー解説マスター');
-  title.setHeading(DocumentApp.ParagraphHeading.TITLE);
-  body.appendParagraph('見出し1 = 部位 / 見出し2 = 種目名 / 本文 = 「ラベル: 内容」の形式で記述してください。');
+  body.appendParagraph('筋トレ メニュー解説マスター')
+      .setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph('見出し1 = 部位 / 見出し2 = 種目名 / 本文 = 「ラベル: 内容」の形式で記述します。' +
+    '書き方は docs/DOC_FORMAT.md を参照してください。');
 
-  var samples = [
-    {
-      part: '胸',
-      items: [{
-        menu: 'ベンチプレス',
-        lines: [
-          '別名: ベンプレ, BP',
-          '器具: バーベル',
-          '主働筋: 大胸筋 / 三角筋前部 / 上腕三頭筋',
-          '推奨レップ: 8〜12',
-          '解説: 肩甲骨を寄せて下制し、みぞおち〜乳頭下のラインにバーを下ろす。胸郭を張ったまま、肘を軽く畳んだ軌道で押し切る。ボトムで胸のストレッチを感じ、トップでは肘を完全にロックせず張力を維持する。',
-          'ポイント: 足で床を押し、下半身の力を体幹経由でバーに伝える',
-          'ポイント: 手首を寝かせず、前腕をバーの真下に垂直に保つ',
-          '注意: 肩がすくむと大胸筋から負荷が抜け、肩を痛めやすい',
-          'YouTube: ベンチプレス解説 | https://www.youtube.com/watch?v=REPLACE_ME',
-          'タグ: コンパウンド, 高重量'
-        ]
-      }]
-    },
-    {
-      part: '背中',
-      items: [{
-        menu: 'ラットプルダウン',
-        lines: [
-          '器具: マシン',
-          '主働筋: 広背筋 / 大円筋 / 僧帽筋下部',
-          '推奨レップ: 8〜12',
-          '解説: 胸を張り、肘を体側に引き下ろす意識でバーを鎖骨に向けて引く。腕で引かず、肩甲骨の下制と内転で動かす。',
-          'ポイント: 上体は10〜20度だけ後傾させ、そこから固定する',
-          '注意: 反動で体を大きく振ると広背筋への刺激が逃げる',
-          'YouTube: ラットプルダウン解説 | https://www.youtube.com/watch?v=REPLACE_ME',
-          'タグ: コンパウンド'
-        ]
-      }]
+  var currentPart = '';
+  var withText = 0;
+  SEED_GUIDE.forEach(function (g) {
+    if (g.part !== currentPart) {
+      currentPart = g.part;
+      body.appendParagraph(currentPart).setHeading(DocumentApp.ParagraphHeading.HEADING1);
     }
-  ];
-
-  samples.forEach(function (s) {
-    body.appendParagraph(s.part).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    s.items.forEach(function (it) {
-      body.appendParagraph(it.menu).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-      it.lines.forEach(function (l) {
-        body.appendParagraph(l).setHeading(DocumentApp.ParagraphHeading.NORMAL);
-      });
+    body.appendParagraph(g.menu).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    if (g.lines.length) withText++;
+    g.lines.forEach(function (line) {
+      body.appendParagraph(line).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     });
   });
 
   doc.saveAndClose();
   clearGuideCache_();
-  Logger.log('雛形を書き込みました: ' + doc.getUrl());
+  Logger.log('解説を書き込みました（' + SEED_GUIDE.length + '種目中 ' + withText + '件に本文あり）: ' + doc.getUrl());
+}
+
+/**
+ * 旧バージョンの Logs / Sessions を、指定ユーザーのシートへ移す。
+ * 移行後、旧シートは Logs_legacy / Sessions_legacy にリネームして残す。
+ */
+function migrateLegacyData(surname) {
+  var s = assertSurname_(normalizeSurname_(surname));
+  if (!findUser_(s)) createUser_(s);
+  var ss = getSpreadsheet_();
+  var moved = [];
+  [['Logs', logsSheetName_(s), LOG_COLUMNS], ['Sessions', sessionsSheetName_(s), SESSION_COLUMNS]]
+    .forEach(function (pair) {
+      var oldSh = ss.getSheetByName(pair[0]);
+      if (!oldSh || oldSh.getLastRow() < 2) return;
+      var rows = readTable_(pair[0], false);
+      var target = getSheet_(pair[1], true);
+      var values = rows.map(function (r) { return toRow_(pair[2], r); });
+      if (values.length) {
+        target.getRange(target.getLastRow() + 1, 1, values.length, pair[2].length).setValues(values);
+      }
+      oldSh.setName(pair[0] + '_legacy');
+      moved.push(pair[0] + ': ' + values.length + '行');
+    });
+  Logger.log(moved.length ? ('移行しました → ' + s + '\n' + moved.join('\n')) : '移行対象の旧シートはありませんでした。');
+  return moved;
 }
 
 /** 動作確認 */
@@ -175,55 +149,70 @@ function selfTest() {
   out.push('SPREADSHEET_ID: ' + getProp_('SPREADSHEET_ID'));
   out.push('DOC_ID: ' + getProp_('DOC_ID'));
   out.push('API_KEY: ' + getProp_('API_KEY').slice(0, 6) + '…');
-  var menus = readMenus_(true);
-  out.push('menus: ' + menus.length + '件');
-  var guides = readGuides_();
-  out.push('guides: ' + guides.length + '件 ' + JSON.stringify(guides.map(function (g) { return g.part + '/' + g.menu; })));
-  var settings = getSettings_(true);
-  out.push('settings: ' + JSON.stringify(settings));
-  if (menus.length) {
-    var s = suggestNextLoad_(readMenuHistory_(menus[0].part, menus[0].menu, 6), menus[0], settings, {});
-    out.push('suggestion(' + menus[0].menu + '): ' + JSON.stringify(s));
+  out.push('menus: ' + readMenus_(true).length + '件');
+  out.push('guides: ' + readGuides_().length + '件');
+  out.push('settings: ' + JSON.stringify(getSettings_(true)));
+  out.push('users: ' + JSON.stringify(listUserNames_()));
+
+  var s = normalizeSurname_('TestUser');
+  out.push('苗字の正規化 "TestUser" → "' + s + '" (有効: ' + SURNAME_RE.test(s) + ')');
+
+  var names = listUserNames_();
+  if (names.length) {
+    var u = findUser_(names[0]);
+    var menus = readMenus_();
+    if (menus.length) {
+      var hist = readMenuHistory_(u, menus[0].part, menus[0].menu, 6);
+      var sug = suggestNextLoad_(hist, menus[0], getSettings_(), u, {});
+      out.push('提案(' + names[0] + ' / ' + menus[0].menu + '): ' + sug.status + ' / ' +
+        sug.recommendedWeight + 'kg / plan ' + JSON.stringify(sug.plan));
+    }
+    out.push('dashboard(' + names[0] + '): ' + JSON.stringify(buildDashboard_(u, null).goal));
+  } else {
+    out.push('※ まだユーザーが登録されていません。アプリのログイン画面から苗字を登録してください。');
   }
-  out.push('dashboard: ' + JSON.stringify(buildDashboard_(null).goal));
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
 
-/** 提案アルゴリズムの単体テスト（シート不要） */
+/** 提案ロジックの単体テスト（シート不要） */
 function testProgression() {
   var settings = {};
   Object.keys(DEFAULT_SETTINGS).forEach(function (k) { settings[k] = DEFAULT_SETTINGS[k]; });
-  var conf = { part: '胸', menu: 'ベンチプレス', repMin: 8, repMax: 12, baseIncrement: 2.5, weightStep: 2.5, defaultSets: 4 };
+  var conf = { part: '胸', menu: 'ベンチプレス', repMin: 8, repMax: 12, defaultSets: 3 };
+  var user = { surname: 'test', weightIncrement: 2.5, restMinutes: 3 };
 
   var cases = [
-    { name: '全セット上限達成 / RPE8 → +2.5kg', hist: [mkSession_('2026-09-01', 60, [12, 12, 12], 8)] },
-    { name: '全セット上限達成 / RPE6.5 → +2.5〜5kg', hist: [mkSession_('2026-09-01', 60, [12, 12, 12], 6.5)] },
-    { name: '全セット上限達成 / RPE9.8 → 据え置き', hist: [mkSession_('2026-09-01', 60, [12, 12, 12], 9.8)] },
-    { name: 'レンジ内 → レップ+1', hist: [mkSession_('2026-09-01', 60, [10, 9, 9], 8)] },
-    { name: '下限未達1回 → 据え置き', hist: [mkSession_('2026-09-01', 60, [7, 6, 5], 9)] },
-    { name: '下限未達2回連続 → ディロード', hist: [mkSession_('2026-09-01', 60, [7, 6, 5], 9), mkSession_('2026-08-28', 60, [7, 7, 6], 9)] },
-    { name: '履歴なし', hist: [] }
+    { name: '前回 60kg 10/9/8 → 62.5kg で同じレップ', hist: [mkSession_('2026-09-01', 60, [10, 9, 8])] },
+    { name: 'セット数4 → 4セットのまま引き継ぐ',       hist: [mkSession_('2026-09-01', 40, [12, 12, 11, 10])] },
+    { name: 'ドロップセット混在 → 各セットに +2.5kg',  hist: [{
+        date: '2026-09-01', sessionId: 't', workSets: [
+          { setNo: 1, weight: 60, reps: 8, rpe: null, isWarmup: false },
+          { setNo: 2, weight: 60, reps: 7, rpe: null, isWarmup: false },
+          { setNo: 3, weight: 50, reps: 10, rpe: null, isWarmup: false }],
+        totalVolume: 1400, est1RM: 76 } ] },
+    { name: '履歴なし → 手入力を促す',                 hist: [] }
   ];
 
   var log = cases.map(function (c) {
-    var r = suggestNextLoad_(c.hist, conf, settings, {});
-    return c.name + '\n  → ' + r.status + ' / ' + r.recommendedWeight + 'kg (delta ' + r.delta + ') / target ' + r.targetReps + '\n  ' + r.reason;
+    var r = suggestNextLoad_(c.hist, conf, settings, user, {});
+    return c.name + '\n  → ' + r.status + ' / ' + r.recommendedWeight + 'kg\n  plan: ' +
+      JSON.stringify(r.plan) + '\n  ' + r.reason;
   }).join('\n\n');
   Logger.log(log);
   return log;
 }
 
-function mkSession_(date, weight, repsArr, rpe) {
+function mkSession_(date, weight, repsArr) {
   var sets = repsArr.map(function (r, i) {
-    return { setNo: i + 1, weight: weight, reps: r, rpe: rpe, isWarmup: false };
+    return { setNo: i + 1, weight: weight, reps: r, rpe: null, isWarmup: false };
   });
   return {
     date: date, sessionId: 'test', sets: sets, workSets: sets,
     topWeight: weight,
     maxReps: Math.max.apply(null, repsArr),
     totalVolume: sets.reduce(function (a, s) { return a + s.weight * s.reps; }, 0),
-    avgRpe: rpe,
+    avgRpe: null,
     est1RM: epley1RM_(weight, Math.max.apply(null, repsArr))
   };
 }

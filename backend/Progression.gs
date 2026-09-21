@@ -1,33 +1,137 @@
 /**
- * Progression.gs — 漸進性過負荷（Progressive Overload）による重量提案アルゴリズム
+ * Progression.gs — 次回の重量とセット構成の決定
  *
- * 方式: ダブルプログレッション + RPE補正
+ * 方式: 前回実績のキャリーオーバー + 固定増量
  *
- *  1. 前回同一 部位×種目 の「メインセット重量 W」を特定する
- *     （ウォームアップを除いた作業セットのうち、最も多く使われた重量。同数なら重い方）
- *  2. W のセットが全て目標レップ上限(repMax)に到達しているか判定する
- *  3. 到達 → 重量を上げる:  増加量 = baseIncrement × rpeFactor  を weightStep に丸める
- *              レップ目標は repMin にリセット（= ダブルプログレッションの折返し）
- *     未到達だが repMin は全セットクリア → 重量据え置き、レップを +1 伸ばす
- *     repMin 未達 → 据え置き。ただし deloadAfterFails 回連続で未達なら deloadRate 分ディロード
- *  4. rpeFactor（前回の主観的きつさで増加幅を調整）
- *        avgRPE <= 7.0            → 1.5   まだ余裕がある。大きめに伸ばす
- *        7.0 <  avgRPE <= 8.5     → 1.0   適正。標準の刻み
- *        8.5 <  avgRPE <= 9.5     → 0.5   きつい。刻みを半分に
- *        9.5 <  avgRPE            → 0.0   限界。重量は据え置きでフォーム/レップ優先
- *        RPE 未記録               → 1.0
- *  5. ユーザーは manualDelta（±kg）または manualWeight（絶対値）で提案を上書きできる
+ *   前回と同じ 部位×種目 の実績を読み、
+ *     ・セット数     … 前回と同じ
+ *     ・各セットのレップ … 前回と同じ（セット単位でそのまま引き継ぐ）
+ *     ・重量         … 前回の重量 + 増量幅（既定 2.5kg / 個人設定で変更可）
+ *   を今回のプランとして返す。ワークアウト開始時点で重量とレップが
+ *   入力済みの状態になるため、実施後は変わった箇所だけ直せばよい。
+ *
+ *   履歴が無い種目は重量を手入力してもらう（status = 'no_history'）。
  */
 
-/** 指定した刻み(step)に丸める。mode: 'nearest' | 'floor' | 'ceil' */
+/** 指定した刻みに丸める。mode: 'nearest' | 'floor' | 'ceil' */
 function roundToStep_(value, step, mode) {
-  if (!step || step <= 0) step = 2.5;
+  if (!step || step <= 0) step = 0.25;
   var q = value / step;
   var r;
   if (mode === 'floor') r = Math.floor(q + 1e-9);
   else if (mode === 'ceil') r = Math.ceil(q - 1e-9);
   else r = Math.round(q);
   return Math.round(r * step * 100) / 100;
+}
+
+/**
+ * @param {Array}  history  readMenuHistory_ の戻り値（新しい順）
+ * @param {Object} conf     findMenuConfig_ の戻り値
+ * @param {Object} settings getSettings_ の戻り値
+ * @param {Object} user     ログイン中のユーザー（weightIncrement を使う）
+ * @param {Object} opts     { manualWeight, manualDelta, sets }
+ */
+function suggestNextLoad_(history, conf, settings, user, opts) {
+  opts = opts || {};
+  var inc = num_(opts.increment, null);
+  if (inc === null) inc = num_(user && user.weightIncrement, num_(settings.defaultWeightIncrement, 2.5));
+  var repMin = num_(conf.repMin, settings.defaultRepMin) || 8;
+  var repMax = num_(conf.repMax, settings.defaultRepMax) || 12;
+
+  var result = {
+    part: conf.part,
+    menu: conf.menu,
+    increment: inc,
+    weightStep: inc,
+    targetRepMin: repMin,
+    targetRepMax: repMax,
+    algorithm: 'carry-over+fixed-increment'
+  };
+
+  var last = (history && history.length) ? history[0] : null;
+  var lastWork = last ? last.workSets : null;
+
+  if (!lastWork || !lastWork.length) {
+    var n = num_(opts.sets, conf.defaultSets) || 3;
+    result.status = 'no_history';
+    result.headline = '初回';
+    result.baseWeight = null;
+    result.recommendedWeight = null;
+    result.delta = 0;
+    result.lastSummary = null;
+    result.plan = [];
+    for (var i = 0; i < n; i++) {
+      result.plan.push({ setNo: i + 1, weight: null, reps: repMin });
+    }
+    result.reason = 'この種目の履歴がまだありません。' + repMin + '〜' + repMax +
+      'レップを全セットこなせる重量を入力してください。次回からは前回の実績をそのまま引き継ぎ、重量だけ +' +
+      inc + 'kg して提案します。';
+    result.finalWeight = num_(opts.manualWeight, null);
+    return result;
+  }
+
+  // --- 前回のメインセット重量 ---
+  var W = detectWorkingWeight_(lastWork);
+  var newWeight = Math.round((W + inc) * 100) / 100;
+
+  result.status = 'carry_over';
+  result.headline = '前回 +' + fmtKg_(inc) + 'kg';
+  result.baseWeight = W;
+  result.recommendedWeight = newWeight;
+  result.delta = inc;
+
+  var repsArr = lastWork.map(function (s) { return s.reps; });
+  var rpes = lastWork.map(function (s) { return s.rpe; }).filter(function (r) { return r !== null && r > 0; });
+  var avgRpe = rpes.length ? Math.round((rpes.reduce(function (a, b) { return a + b; }, 0) / rpes.length) * 10) / 10 : null;
+
+  result.lastSummary = {
+    date: last.date,
+    weight: W,
+    sets: lastWork.length,
+    reps: repsArr,
+    avgRpe: avgRpe,
+    totalVolume: Math.round(last.totalVolume * 10) / 10,
+    est1RM: last.est1RM
+  };
+
+  // --- 前回の構成をそのまま引き継ぎ、重量だけ上げる ---
+  result.plan = lastWork.map(function (s, i) {
+    return {
+      setNo: i + 1,
+      weight: Math.round((s.weight + inc) * 100) / 100,   // 重量の違うセットもそれぞれ +inc
+      reps: s.reps,
+      prevWeight: s.weight,
+      prevReps: s.reps
+    };
+  });
+
+  result.reason = '前回 ' + last.date + ' は ' + fmtKg_(W) + 'kg × ' + repsArr.join('/') +
+    'レップ（' + lastWork.length + 'セット）でした。セット数とレップはそのまま引き継ぎ、重量だけ +' +
+    fmtKg_(inc) + 'kg した ' + fmtKg_(newWeight) + 'kg を今回のプランにしています。' +
+    'きつい場合はこの画面で重量を下げてから開始してください。';
+
+  result.deltaOptions = [-2 * inc, -inc, inc, 2 * inc].map(function (v) {
+    return Math.round(v * 100) / 100;
+  });
+
+  // --- 手動上書き ---
+  var manualWeight = num_(opts.manualWeight, null);
+  var manualDelta = num_(opts.manualDelta, 0) || 0;
+  if (manualWeight !== null) {
+    result.finalWeight = roundToStep_(manualWeight, 0.25, 'nearest');
+    result.overridden = true;
+  } else if (manualDelta !== 0) {
+    result.finalWeight = Math.round((newWeight + manualDelta) * 100) / 100;
+    result.overridden = true;
+  } else {
+    result.finalWeight = newWeight;
+    result.overridden = false;
+  }
+
+  result.est1RMAtTarget = epley1RM_(result.finalWeight, repsArr[0] || repMin);
+  result.projectedVolume = Math.round(
+    result.plan.reduce(function (a, p) { return a + (result.finalWeight) * p.reps; }, 0) * 10) / 10;
+  return result;
 }
 
 /** 作業セットから「メインセット重量」を決める（最頻値、同数なら重い方） */
@@ -48,192 +152,8 @@ function detectWorkingWeight_(workSets) {
   return best;
 }
 
-/** avgRpe から増加係数を求める */
-function rpeFactor_(avgRpe, settings) {
-  if (avgRpe === null || avgRpe === undefined || !isFinite(avgRpe) || avgRpe <= 0) {
-    return { factor: 1.0, label: 'RPE未記録', note: 'RPEの記録が無いため標準の刻みで提案します。' };
-  }
-  if (avgRpe <= settings.rpeEasyThreshold) {
-    return { factor: 1.5, label: 'まだ余裕あり', note: '前回のRPE ' + avgRpe + ' は軽めなので増加幅を1.5倍にしました。' };
-  }
-  if (avgRpe <= settings.rpeNormalThreshold) {
-    return { factor: 1.0, label: '適正', note: '前回のRPE ' + avgRpe + ' は適正範囲です。標準の刻みで増量します。' };
-  }
-  if (avgRpe <= settings.rpeHardThreshold) {
-    return { factor: 0.5, label: 'かなりきつい', note: '前回のRPE ' + avgRpe + ' が高めなので増加幅を半分に抑えました。' };
-  }
-  return { factor: 0.0, label: '限界', note: '前回のRPE ' + avgRpe + ' は限界域です。重量は据え置き、フォームとレップを優先してください。' };
-}
-
-/** そのセッションが repMin を全セットでクリアできたか */
-function sessionCleared_(session, repMin) {
-  var w = detectWorkingWeight_(session.workSets);
-  var atW = session.workSets.filter(function (s) { return s.weight === w; });
-  if (!atW.length) return true;
-  return atW.every(function (s) { return s.reps >= repMin; });
-}
-
-/**
- * メインの提案関数
- * @param {Array}  history   readMenuHistory_ の戻り値（新しい順）
- * @param {Object} conf      findMenuConfig_ の戻り値
- * @param {Object} settings  getSettings_ の戻り値
- * @param {Object} opts      { manualDelta, manualWeight, targetRepMin, targetRepMax }
- */
-function suggestNextLoad_(history, conf, settings, opts) {
-  opts = opts || {};
-  var repMin = num_(opts.targetRepMin, conf.repMin) || settings.defaultRepMin;
-  var repMax = num_(opts.targetRepMax, conf.repMax) || settings.defaultRepMax;
-  var step = conf.weightStep || settings.defaultWeightStep;
-  var baseInc = conf.baseIncrement || step;
-
-  var result = {
-    part: conf.part,
-    menu: conf.menu,
-    weightStep: step,
-    baseIncrement: baseInc,
-    targetRepMin: repMin,
-    targetRepMax: repMax,
-    recommendedSets: conf.defaultSets || 3,
-    algorithm: 'double-progression+rpe'
-  };
-
-  var last = (history && history.length) ? history[0] : null;
-  if (!last || !last.workSets || !last.workSets.length) {
-    result.status = 'no_history';
-    result.baseWeight = null;
-    result.recommendedWeight = null;
-    result.delta = 0;
-    result.targetReps = repMin + '〜' + repMax;
-    result.rpeFactor = 1.0;
-    result.avgRpe = null;
-    result.headline = '初回記録';
-    result.reason = 'この種目の履歴がまだありません。' + repMin + '〜' + repMax + 'レップを全セット丁寧にこなせる重量から始めてください。次回からこの実績を基に自動提案します。';
-    result.lastSummary = null;
-    result.deltaOptions = buildDeltaOptions_(step);
-    result.finalWeight = num_(opts.manualWeight, null);
-    return result;
-  }
-
-  var W = detectWorkingWeight_(last.workSets);
-  var setsAtW = last.workSets.filter(function (s) { return s.weight === W; });
-  var repsAtW = setsAtW.map(function (s) { return s.reps; });
-  var minRepsAtW = Math.min.apply(null, repsAtW);
-  var maxRepsAtW = Math.max.apply(null, repsAtW);
-
-  var rpes = setsAtW.map(function (s) { return s.rpe; }).filter(function (r) { return r !== null && r > 0; });
-  var avgRpe = rpes.length ? Math.round((rpes.reduce(function (a, b) { return a + b; }, 0) / rpes.length) * 10) / 10 : null;
-  var rf = rpeFactor_(avgRpe, settings);
-
-  result.baseWeight = W;
-  result.avgRpe = avgRpe;
-  result.rpeFactor = rf.factor;
-  result.rpeLabel = rf.label;
-  result.lastSummary = {
-    date: last.date,
-    weight: W,
-    sets: setsAtW.length,
-    reps: repsAtW,
-    minReps: minRepsAtW,
-    maxReps: maxRepsAtW,
-    avgRpe: avgRpe,
-    totalVolume: Math.round(last.totalVolume * 10) / 10,
-    est1RM: last.est1RM
-  };
-
-  var achievedTop = setsAtW.every(function (s) { return s.reps >= repMax; });
-  var clearedMin = setsAtW.every(function (s) { return s.reps >= repMin; });
-
-  if (achievedTop) {
-    var rawInc = baseInc * rf.factor;
-    var inc = roundToStep_(rawInc, step, 'nearest');
-    if (rf.factor > 0 && inc <= 0) inc = step;   // 係数が小さすぎて0になった場合は最小刻み
-    if (rf.factor === 0) inc = 0;
-
-    if (inc > 0) {
-      result.status = 'increase';
-      result.delta = inc;
-      result.recommendedWeight = Math.round((W + inc) * 100) / 100;
-      result.targetReps = repMin + '〜' + repMax;
-      result.headline = '増量';
-      result.reason = '前回 ' + last.date + ' に ' + W + 'kg × ' + setsAtW.length + 'セットすべてで上限 ' + repMax +
-        'レップを達成しました。' + rf.note + ' 増加量 = ' + baseInc + 'kg × ' + rf.factor + ' → ' + inc + 'kg（' + step + 'kg刻みに丸め）。' +
-        '重量を上げるのでレップは ' + repMin + ' から積み直します。';
-    } else {
-      result.status = 'hold';
-      result.delta = 0;
-      result.recommendedWeight = W;
-      result.targetReps = repMax + '（維持）';
-      result.headline = '据え置き';
-      result.reason = '上限レップは達成していますが、' + rf.note + ' 同じ ' + W + 'kg でフォームを固め、RPEが下がってから増量します。';
-    }
-
-  } else if (clearedMin) {
-    var nextTarget = Math.min(maxRepsAtW + 1, repMax);
-    result.status = 'add_reps';
-    result.delta = 0;
-    result.recommendedWeight = W;
-    result.targetReps = nextTarget + '（前回最大 ' + maxRepsAtW + '）';
-    result.headline = 'レップ +1';
-    result.reason = '前回 ' + W + 'kg で ' + repsAtW.join('/') + 'レップ。目標下限 ' + repMin + 'は超えていますが上限 ' + repMax +
-      'に未達のため、重量は据え置きでレップを伸ばします（ダブルプログレッションの前半）。全セット ' + repMax + 'レップに乗ったら次回自動で増量します。';
-
-  } else {
-    var failStreak = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (!sessionCleared_(history[i], repMin)) failStreak++;
-      else break;
-    }
-    result.failStreak = failStreak;
-
-    if (failStreak >= settings.deloadAfterFails) {
-      var deloaded = roundToStep_(W * (1 - settings.deloadRate), step, 'floor');
-      if (deloaded >= W) deloaded = Math.max(step, W - step);
-      result.status = 'deload';
-      result.delta = Math.round((deloaded - W) * 100) / 100;
-      result.recommendedWeight = deloaded;
-      result.targetReps = repMin + '〜' + repMax;
-      result.headline = 'ディロード';
-      result.reason = failStreak + '回連続で下限 ' + repMin + 'レップに届いていません（前回 ' + repsAtW.join('/') + '）。' +
-        Math.round(settings.deloadRate * 100) + '%落として ' + deloaded + 'kg から組み直し、フォームと可動域を優先してください。';
-    } else {
-      result.status = 'hold';
-      result.delta = 0;
-      result.recommendedWeight = W;
-      result.targetReps = repMin + '〜' + repMax;
-      result.headline = '据え置き';
-      result.reason = '前回 ' + W + 'kg で ' + repsAtW.join('/') + 'レップ。下限 ' + repMin + 'に未達のため同じ重量で再挑戦します。' +
-        'あと ' + (settings.deloadAfterFails - failStreak) + '回未達が続くとディロードを提案します。';
-    }
-  }
-
-  result.deltaOptions = buildDeltaOptions_(step);
-
-  // --- 手動上書き ---
-  var manualWeight = num_(opts.manualWeight, null);
-  var manualDelta = num_(opts.manualDelta, 0) || 0;
-  if (manualWeight !== null) {
-    result.finalWeight = roundToStep_(manualWeight, 0.25, 'nearest');
-    result.overridden = true;
-  } else if (manualDelta !== 0) {
-    result.finalWeight = Math.round((result.recommendedWeight + manualDelta) * 100) / 100;
-    result.overridden = true;
-  } else {
-    result.finalWeight = result.recommendedWeight;
-    result.overridden = false;
-  }
-  result.manualDelta = manualDelta;
-
-  if (result.finalWeight) {
-    result.projectedVolume = Math.round(result.finalWeight * repMin * (result.recommendedSets || 3) * 10) / 10;
-    result.est1RMAtTarget = epley1RM_(result.finalWeight, repMin);
-  }
-
-  return result;
-}
-
-function buildDeltaOptions_(step) {
-  return [-2 * step, -step, 0, step, 2 * step].map(function (v) {
-    return Math.round(v * 100) / 100;
-  });
+/** 表示用: 小数点以下が 0 なら整数で返す */
+function fmtKg_(v) {
+  var n = Number(v);
+  return (Math.round(n * 100) % 100 === 0) ? String(Math.round(n)) : String(Math.round(n * 100) / 100);
 }

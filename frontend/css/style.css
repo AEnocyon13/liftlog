@@ -786,6 +786,81 @@ textarea.md-field__input { height: auto; min-height: 80px; resize: vertical; }
 }
 .ll-sticky-actions .md-button + .md-button { margin-top: 8px; }
 
+/* ログイン画面 */
+.ll-login { max-width: 420px; margin: 24px auto 0; text-align: center; }
+.ll-login__mark {
+  width: 64px; height: 64px; margin: 0 auto 20px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.ll-login form { text-align: left; }
+.ll-login #surname { text-align: center; letter-spacing: .12em; font-size: 20px; }
+.ll-login .md-section-header { text-align: left; }
+.ll-login .md-chip-set { justify-content: center; }
+
+/* 休憩タイマー */
+.ll-rest {
+  position: sticky; top: calc(var(--ll-bar-height) + 8px); z-index: 30;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 16px; margin-bottom: 12px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  border: 2px solid transparent;
+  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+              border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.ll-rest--running { border-color: var(--md-sys-color-primary); }
+.ll-rest--done {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-color: var(--md-sys-color-primary);
+  animation: ll-rest-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ll-rest-pulse { 50% { opacity: .72; } }
+.ll-rest__main { min-width: 0; }
+.ll-rest__clock {
+  font-size: 32px; line-height: 40px; font-variant-numeric: tabular-nums; letter-spacing: -.5px;
+}
+.ll-rest--running .ll-rest__clock { color: var(--md-sys-color-primary); }
+.ll-rest--done .ll-rest__clock { color: var(--md-sys-color-on-primary-container); }
+.ll-rest__controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+.ll-rest__minutes { display: flex; align-items: center; gap: 2px; }
+.ll-rest__minutes .md-icon-button { width: 36px; height: 36px; }
+.ll-rest__min { min-width: 44px; text-align: center; font-size: 18px; font-weight: 500; }
+.ll-rest__min small { font-size: 11px; font-weight: 400; margin-left: 1px; }
+
+/* 今回のプラン（セットごとの重量×レップ） */
+.ll-plan { display: flex; flex-direction: column; gap: 6px; }
+.ll-plan__row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container);
+}
+.ll-plan__no {
+  width: 24px; height: 24px; flex: none; border-radius: var(--md-sys-shape-corner-full);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px; font-weight: 500;
+}
+.ll-plan__weight { font-size: 18px; font-weight: 500; min-width: 64px; }
+.ll-plan__weight small { font-size: 11px; font-weight: 400; margin-left: 1px; }
+.ll-plan__reps {
+  width: 56px; height: 36px; text-align: center; background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  font-size: 16px; font-weight: 500; outline: none;
+}
+.ll-plan__reps:focus { border-width: 2px; border-color: var(--md-sys-color-primary); }
+.ll-plan__unit { white-space: nowrap; flex: none; }
+.ll-plan__prev {
+  margin-left: auto; min-width: 0; text-align: right;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* 動きを減らす設定の尊重 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

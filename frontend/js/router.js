@@ -1,4 +1,5 @@
-/** router.js — ハッシュベースの簡易ルーター */
+/** router.js — ハッシュベースの簡易ルーター（ログインガード付き） */
+import { getUser } from './state.js';
 
 const routes = {};
 let previous = null;
@@ -16,7 +17,16 @@ export function navigate(path) {
 
 export async function handleRoute() {
   const path = currentPath();
-  const route = routes[path] || routes['/home'];
+  let route = routes[path] || routes['/home'];
+
+  // ログインが必要な画面は、未ログインならログイン画面に置き換える
+  if (route.requiresUser && !getUser()) {
+    route = routes['/login'];
+    if (location.hash !== '#/login') {
+      location.replace('#/login');
+      return;                       // hashchange で再度この関数が走る
+    }
+  }
 
   if (previous?.teardown) {
     try { previous.teardown(); } catch { /* noop */ }

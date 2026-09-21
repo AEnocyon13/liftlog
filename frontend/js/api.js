@@ -7,9 +7,11 @@
  *    Apps Script は OPTIONS に応答できないためリクエストが失敗する。
  *  - GAS は 302 で script.googleusercontent.com にリダイレクトするので
  *    redirect: 'follow'（既定）のままにすること。
+ *  - 実績系の action にはログイン中の苗字（user）を自動で付与する。
  */
 
 import { setLoading } from './ui.js';
+import { getUser } from './state.js';
 
 const LS_CONFIG = 'liftlog.config';
 
@@ -32,13 +34,19 @@ export function isConfigured() {
   return Boolean(c.apiUrl && c.apiKey);
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
 
-async function request(action, payload = {}, method = 'GET', { silent = false } = {}) {
+async function request(action, payload = {}, method = 'GET', { silent = false, withUser = true } = {}) {
   const { apiUrl, apiKey } = getConfig();
   if (!apiUrl || !apiKey) throw new ApiError('NOT_CONFIGURED', 'API URL と APIキーを設定画面で登録してください。');
+
+  const body = { ...payload };
+  if (withUser && body.user === undefined) {
+    const u = getUser();
+    if (u) body.user = u;
+  }
 
   if (!silent) setLoading(true);
   try {
@@ -47,7 +55,7 @@ async function request(action, payload = {}, method = 'GET', { silent = false } 
       const url = new URL(apiUrl);
       url.searchParams.set('action', action);
       url.searchParams.set('key', apiKey);
-      Object.entries(payload).forEach(([k, v]) => {
+      Object.entries(body).forEach(([k, v]) => {
         if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
       });
       res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
@@ -56,7 +64,7 @@ async function request(action, payload = {}, method = 'GET', { silent = false } 
         method: 'POST',
         redirect: 'follow',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, key: apiKey, payload })
+        body: JSON.stringify({ action, key: apiKey, payload: body })
       });
     }
 
@@ -79,16 +87,21 @@ async function request(action, payload = {}, method = 'GET', { silent = false } 
 }
 
 export const api = {
-  ping:          (opts)     => request('ping', {}, 'GET', opts),
-  bootstrap:     ()         => request('getBootstrap'),
-  menus:         ()         => request('getMenus'),
-  guides:        (refresh)  => request('getGuides', refresh ? { refresh: 'true' } : {}),
-  suggestion:    (p)        => request('getSuggestion', p),
-  history:       (p)        => request('getHistory', p),
-  dashboard:     (month)    => request('getDashboard', month ? { month } : {}),
-  startSession:  (p)        => request('startSession', p, 'POST'),
-  finishSession: (p)        => request('finishSession', p, 'POST'),
-  deleteSession: (id)       => request('deleteSession', { sessionId: id }, 'POST'),
-  saveSetting:   (k, v)     => request('saveSetting', { key: k, value: v }, 'POST'),
-  upsertMenu:    (p)        => request('upsertMenu', p, 'POST')
+  ping:            (opts)            => request('ping', {}, 'GET', { ...opts, withUser: false }),
+  listUsers:       ()                => request('listUsers', {}, 'GET', { withUser: false }),
+  /** 未登録なら {registered:false, needsConfirm:true} が返る。confirmCreate:true で新規作成。 */
+  login:           (surname, confirmCreate = false) =>
+                     request('login', { surname, confirmCreate }, 'POST', { withUser: false }),
+  bootstrap:       ()                => request('getBootstrap'),
+  menus:           ()                => request('getMenus', {}, 'GET', { withUser: false }),
+  guides:          (refresh)         => request('getGuides', refresh ? { refresh: 'true' } : {}, 'GET', { withUser: false }),
+  suggestion:      (p)               => request('getSuggestion', p),
+  history:         (p)               => request('getHistory', p),
+  dashboard:       (month)           => request('getDashboard', month ? { month } : {}),
+  startSession:    (p)               => request('startSession', p, 'POST'),
+  finishSession:   (p)               => request('finishSession', p, 'POST'),
+  deleteSession:   (id)              => request('deleteSession', { sessionId: id }, 'POST'),
+  saveUserSetting: (k, v)            => request('saveUserSetting', { key: k, value: v }, 'POST'),
+  saveSetting:     (k, v)            => request('saveSetting', { key: k, value: v }, 'POST', { withUser: false }),
+  upsertMenu:      (p)               => request('upsertMenu', p, 'POST', { withUser: false })
 };

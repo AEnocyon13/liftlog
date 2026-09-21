@@ -1,5 +1,8 @@
 /**
  * SheetRepo.gs — スプレッドシートの読み書き
+ *
+ * 実績（Logs_<姓> / Sessions_<姓>）はユーザーごとにシートが分かれているため、
+ * 実績系の関数はすべて第1引数に user（resolveUser_ の戻り値）を取る。
  */
 
 /* ---------- 低レベルユーティリティ ---------- */
@@ -8,15 +11,17 @@ function getSheet_(name, createIfMissing) {
   var ss = getSpreadsheet_();
   var sh = ss.getSheetByName(name);
   if (!sh) {
-    if (!createIfMissing) throw apiError_('SHEET_NOT_FOUND', 'シート「' + name + '」がありません。setupSpreadsheet() を実行してください。');
+    if (!createIfMissing) {
+      throw apiError_('SHEET_NOT_FOUND', 'シート「' + name + '」がありません。setupSpreadsheet() を実行してください。');
+    }
     sh = ss.insertSheet(name);
   }
   return sh;
 }
 
 /** シート全体をヘッダ行基準でオブジェクト配列にして返す */
-function readTable_(sheetName) {
-  var sh = getSheet_(sheetName);
+function readTable_(sheetName, createIfMissing) {
+  var sh = getSheet_(sheetName, createIfMissing !== false);
   var values = sh.getDataRange().getValues();
   if (values.length < 2) return [];
   var header = values[0].map(function (h) { return String(h).trim(); });
@@ -61,7 +66,8 @@ function normDate_(v) {
 
 function num_(v, fallback) {
   var n = Number(v);
-  return isFinite(n) && v !== '' && v !== null ? n : (fallback === undefined ? null : fallback);
+  return (isFinite(n) && v !== '' && v !== null && v !== undefined)
+    ? n : (fallback === undefined ? null : fallback);
 }
 
 function bool_(v) {
@@ -69,7 +75,12 @@ function bool_(v) {
   return s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === '○';
 }
 
-/* ---------- Settings ---------- */
+function epley1RM_(weight, reps) {
+  if (!weight || !reps) return 0;
+  return Math.round(weight * (1 + reps / 30) * 10) / 10;
+}
+
+/* ---------- Settings（全員共通） ---------- */
 
 var _settingsCache = null;
 
@@ -98,15 +109,12 @@ function writeSetting_(key, value) {
   var sh = getSheet_(SHEETS.SETTINGS, true);
   var rows = readTable_(SHEETS.SETTINGS);
   var hit = rows.filter(function (r) { return String(r.key).trim() === key; })[0];
-  if (hit) {
-    sh.getRange(hit._row, 2).setValue(value);
-  } else {
-    sh.appendRow([key, value, '']);
-  }
+  if (hit) sh.getRange(hit._row, 2).setValue(value);
+  else sh.appendRow([key, value, '']);
   _settingsCache = null;
 }
 
-/* ---------- Menus ---------- */
+/* ---------- Menus（種目マスター・全員共通） ---------- */
 
 var _menuCache = null;
 
@@ -115,7 +123,10 @@ function readMenus_(force) {
   var s = getSettings_();
   var rows = readTable_(SHEETS.MENUS);
   var menus = rows
-    .filter(function (r) { return String(r.menu || '').trim() !== '' && (r.active === '' || r.active === undefined || bool_(r.active)); })
+    .filter(function (r) {
+      return String(r.menu || '').trim() !== '' &&
+        (r.active === '' || r.active === undefined || bool_(r.active));
+    })
     .map(function (r) {
       return {
         part: String(r.part || '').trim(),
@@ -123,14 +134,18 @@ function readMenus_(force) {
         equipment: String(r.equipment || '').trim(),
         repMin: num_(r.repMin, s.defaultRepMin),
         repMax: num_(r.repMax, s.defaultRepMax),
-        baseIncrement: num_(r.baseIncrement, s.defaultWeightStep),
-        weightStep: num_(r.weightStep, s.defaultWeightStep),
         defaultSets: num_(r.defaultSets, 3),
         order: num_(r.order, 999)
       };
     });
+  // 部位は Menus シートの出現順を保つ（胸→背中→脚→肩→腕→腹）
+  var partOrder = {};
+  rows.forEach(function (r, i) {
+    var p = String(r.part || '').trim();
+    if (p && partOrder[p] === undefined) partOrder[p] = i;
+  });
   menus.sort(function (a, b) {
-    if (a.part !== b.part) return a.part < b.part ? -1 : 1;
+    if (a.part !== b.part) return (partOrder[a.part] || 0) - (partOrder[b.part] || 0);
     return a.order - b.order;
   });
   _menuCache = menus;
@@ -143,11 +158,9 @@ function findMenuConfig_(part, menu) {
     return m.part === String(part).trim() && m.menu === String(menu).trim();
   })[0];
   if (hit) return hit;
-  // Menus シートに無い種目でも動くようフォールバック
   return {
     part: String(part), menu: String(menu), equipment: '',
     repMin: s.defaultRepMin, repMax: s.defaultRepMax,
-    baseIncrement: s.defaultWeightStep, weightStep: s.defaultWeightStep,
     defaultSets: 3, order: 999, _fallback: true
   };
 }
@@ -156,29 +169,26 @@ function upsertMenu_(obj) {
   var sh = getSheet_(SHEETS.MENUS, true);
   var rows = readTable_(SHEETS.MENUS);
   var hit = rows.filter(function (r) {
-    return String(r.part).trim() === String(obj.part).trim() && String(r.menu).trim() === String(obj.menu).trim();
+    return String(r.part).trim() === String(obj.part).trim() &&
+           String(r.menu).trim() === String(obj.menu).trim();
   })[0];
   var merged = {};
   MENU_COLUMNS.forEach(function (c) {
     merged[c] = (obj[c] !== undefined && obj[c] !== '') ? obj[c] : (hit ? hit[c] : '');
   });
   if (merged.active === '') merged.active = true;
-  if (hit) {
-    sh.getRange(hit._row, 1, 1, MENU_COLUMNS.length).setValues([toRow_(MENU_COLUMNS, merged)]);
-  } else {
-    sh.appendRow(toRow_(MENU_COLUMNS, merged));
-  }
+  if (hit) sh.getRange(hit._row, 1, 1, MENU_COLUMNS.length).setValues([toRow_(MENU_COLUMNS, merged)]);
+  else sh.appendRow(toRow_(MENU_COLUMNS, merged));
   _menuCache = null;
 }
 
-/* ---------- Logs（実績） ---------- */
+/* ---------- Logs（実績・ユーザー別） ---------- */
 
 /**
- * 指定 部位×種目 の履歴を「セッション単位」でまとめて新しい順に返す。
- * 戻り値: [{ date, sessionId, sets:[{setNo,weight,reps,rpe,isWarmup}], workSets, topWeight, maxReps, totalVolume, avgRpe }]
+ * 指定 部位×種目 の履歴をセッション単位でまとめて新しい順に返す。
  */
-function readMenuHistory_(part, menu, limitSessions) {
-  var logs = readTable_(SHEETS.LOGS);
+function readMenuHistory_(user, part, menu, limitSessions) {
+  var logs = readTable_(logsSheetName_(user.surname), true);
   var p = String(part).trim(), m = String(menu).trim();
   var filtered = logs.filter(function (r) {
     return String(r.part).trim() === p && String(r.menu).trim() === m;
@@ -187,9 +197,7 @@ function readMenuHistory_(part, menu, limitSessions) {
   var bySession = {};
   filtered.forEach(function (r) {
     var sid = String(r.sessionId || ('nosid-' + normDate_(r.date)));
-    if (!bySession[sid]) {
-      bySession[sid] = { sessionId: sid, date: normDate_(r.date), sets: [] };
-    }
+    if (!bySession[sid]) bySession[sid] = { sessionId: sid, date: normDate_(r.date), sets: [] };
     bySession[sid].sets.push({
       setNo: num_(r.setNo, 0),
       weight: num_(r.weight, 0),
@@ -218,15 +226,10 @@ function readMenuHistory_(part, menu, limitSessions) {
   return sessions.slice(0, limitSessions || 6);
 }
 
-function epley1RM_(weight, reps) {
-  if (!weight || !reps) return 0;
-  return Math.round(weight * (1 + reps / 30) * 10) / 10;
-}
+/* ---------- Sessions（ユーザー別） ---------- */
 
-/* ---------- Sessions（セッション） ---------- */
-
-function findOpenSession_() {
-  var rows = readTable_(SHEETS.SESSIONS);
+function findOpenSession_(user) {
+  var rows = readTable_(sessionsSheetName_(user.surname), true);
   for (var i = rows.length - 1; i >= 0; i--) {
     if (!rows[i].endTime) {
       return {
@@ -241,15 +244,15 @@ function findOpenSession_() {
   return null;
 }
 
-function startSession_(payload) {
+function startSession_(user, payload) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    var sh = getSheet_(SHEETS.SESSIONS, true);
+    var sh = getSheet_(sessionsSheetName_(user.surname), true);
     var now = new Date();
     var sessionId = payload.sessionId || uuid_();
     var startTime = payload.startTime || now.toISOString();
-    var rec = {
+    sh.appendRow(toRow_(SESSION_COLUMNS, {
       sessionId: sessionId,
       date: payload.date || fmtDate_(now),
       startTime: startTime,
@@ -259,21 +262,18 @@ function startSession_(payload) {
       menus: (payload.menus || []).join(' / '),
       totalSets: '',
       totalVolume: '',
-      condition: payload.condition || '',
+      restMinutes: num_(payload.restMinutes, user.restMinutes),
       memo: payload.memo || '',
       createdAt: now.toISOString()
-    };
-    sh.appendRow(toRow_(SESSION_COLUMNS, rec));
-    return { sessionId: sessionId, startTime: startTime, date: rec.date };
+    }));
+    return { sessionId: sessionId, startTime: startTime, date: payload.date || fmtDate_(now) };
   } finally {
     lock.releaseLock();
   }
 }
 
-/**
- * セッション終了。entries の全セットを Logs に追記し、Sessions を更新する。
- */
-function finishSession_(payload) {
+/** セッション終了。entries の全セットを Logs_<姓> に追記し、Sessions_<姓> を更新する。 */
+function finishSession_(user, payload) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -283,7 +283,7 @@ function finishSession_(payload) {
     var startTime = payload.startTime || endTime;
     var date = payload.date || fmtDate_(new Date(startTime));
 
-    var logSh = getSheet_(SHEETS.LOGS, true);
+    var logSh = getSheet_(logsSheetName_(user.surname), true);
     var rows = [];
     var totalVolume = 0, totalSets = 0;
     var parts = [], menus = [];
@@ -297,7 +297,7 @@ function finishSession_(payload) {
       (entry.sets || []).forEach(function (set, idx) {
         var weight = num_(set.weight, 0);
         var reps = num_(set.reps, 0);
-        if (!reps) return; // レップ0のセットは記録しない
+        if (!reps) return;                       // レップ0のセットは記録しない
         var warm = !!set.isWarmup;
         var volume = warm ? 0 : weight * reps;
         if (!warm) { totalVolume += volume; totalSets += 1; }
@@ -324,9 +324,8 @@ function finishSession_(payload) {
       logSh.getRange(logSh.getLastRow() + 1, 1, rows.length, LOG_COLUMNS.length).setValues(rows);
     }
 
-    // Sessions 行の更新（無ければ追記）
-    var sesSh = getSheet_(SHEETS.SESSIONS, true);
-    var sessions = readTable_(SHEETS.SESSIONS);
+    var sesSh = getSheet_(sessionsSheetName_(user.surname), true);
+    var sessions = readTable_(sessionsSheetName_(user.surname), true);
     var hit = sessions.filter(function (r) { return String(r.sessionId) === sessionId; })[0];
     var durationMin = Math.max(0, Math.round((new Date(endTime) - new Date(startTime)) / 60000));
     var rec = {
@@ -339,40 +338,37 @@ function finishSession_(payload) {
       menus: menus.join(' / '),
       totalSets: totalSets,
       totalVolume: Math.round(totalVolume * 10) / 10,
-      condition: payload.condition || (hit ? hit.condition : ''),
+      restMinutes: num_(payload.restMinutes, hit ? num_(hit.restMinutes, user.restMinutes) : user.restMinutes),
       memo: payload.memo || (hit ? hit.memo : ''),
       createdAt: hit ? hit.createdAt : now.toISOString()
     };
-    if (hit) {
-      sesSh.getRange(hit._row, 1, 1, SESSION_COLUMNS.length).setValues([toRow_(SESSION_COLUMNS, rec)]);
-    } else {
-      sesSh.appendRow(toRow_(SESSION_COLUMNS, rec));
-    }
+    if (hit) sesSh.getRange(hit._row, 1, 1, SESSION_COLUMNS.length).setValues([toRow_(SESSION_COLUMNS, rec)]);
+    else sesSh.appendRow(toRow_(SESSION_COLUMNS, rec));
 
     return {
       sessionId: sessionId,
       savedSets: rows.length,
       totalVolume: rec.totalVolume,
       durationMin: durationMin,
-      dashboard: buildDashboard_(date.slice(0, 7))
+      dashboard: buildDashboard_(user, date.slice(0, 7))
     };
   } finally {
     lock.releaseLock();
   }
 }
 
-function deleteSession_(sessionId) {
+function deleteSession_(user, sessionId) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
     var deleted = 0;
-    [SHEETS.LOGS, SHEETS.SESSIONS].forEach(function (name) {
+    [logsSheetName_(user.surname), sessionsSheetName_(user.surname)].forEach(function (name) {
       var sh = getSheet_(name, true);
-      var rows = readTable_(name)
+      readTable_(name, true)
         .filter(function (r) { return String(r.sessionId) === sessionId; })
         .map(function (r) { return r._row; })
-        .sort(function (a, b) { return b - a; });   // 下から消す
-      rows.forEach(function (rowIdx) { sh.deleteRow(rowIdx); deleted++; });
+        .sort(function (a, b) { return b - a; })      // 下から消す
+        .forEach(function (rowIdx) { sh.deleteRow(rowIdx); deleted++; });
     });
     return { deletedRows: deleted };
   } finally {

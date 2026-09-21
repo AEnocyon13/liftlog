@@ -1,5 +1,5 @@
 /** home.js — ホーム（Extended FAB + 今月サマリ） */
-import { state, loadDraft } from '../state.js';
+import { state, loadDraft, getUser } from '../state.js';
 import { isConfigured } from '../api.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtDateJP, emptyState } from '../ui.js';
 
@@ -28,6 +28,11 @@ export function render(root) {
   const d = state.dashboard;
 
   root.innerHTML = `
+    <div class="ll-row ll-row--between" style="margin:4px 4px 12px">
+      <span class="md-title-medium">${esc(getUser() || '')} さんの記録</span>
+      <a class="md-chip md-chip--assist md-state" href="#/settings">${icon('person', 'icon--sm')}切り替え</a>
+    </div>
+
     ${active ? resumeFab(draft) : startFab()}
 
     ${d ? `

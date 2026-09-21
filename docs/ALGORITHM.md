@@ -1,11 +1,11 @@
 # 重量提案アルゴリズム仕様
 
-実装：[`backend/Progression.gs`](../backend/Progression.gs) の `suggestNextLoad_()`
+実装: [`backend/Progression.gs`](../backend/Progression.gs) の `suggestNextLoad_()`
 
-方式は **ダブルプログレッション（重量とレップの二段階漸進） + RPE補正**。
-「レップが目標レンジの上限に届くまでは重量を据え置いてレップを伸ばし、
-上限に届いたら重量を上げてレップをリセットする」という古典的で破綻しにくい進め方に、
-主観的強度（RPE）による増加幅の調整を足したもの。
+方式は **前回実績のキャリーオーバー + 固定増量**。
+
+> 前回と同じ 部位×種目 の実績を読み、**セット数とレップ数はそのまま引き継ぎ、重量だけ一定量（既定 2.5kg）上げる**。
+> ワークアウト開始時点で重量もレップも入力済みの状態になるので、実施後は変わった箇所だけ直せばよい。
 
 ---
 
@@ -13,72 +13,36 @@
 
 | 記号 | 取得元 | 説明 |
 |---|---|---|
-| `history` | Logs シート | 同一 部位×種目 の直近6セッション（新しい順、セッション単位に集約済み） |
-| `repMin` / `repMax` | Menus シート | 目標レップ下限・上限 |
-| `baseIncrement` | Menus シート | 増量時の基準増加量 kg |
-| `weightStep` | Menus シート | 実際に扱える最小刻み kg |
-| `deloadRate` / `deloadAfterFails` | Settings シート | ディロード率・発動回数 |
-| `manualDelta` / `manualWeight` | ユーザー操作 | 手動上書き |
+| `history` | `Logs_<姓>` シート | 同一 部位×種目 の直近6セッション（新しい順、セッション単位に集約済み） |
+| `increment` | Users シートの `weightIncrement` | 前回比で足す重量(kg)。既定 2.5、ユーザーごとに変更可 |
+| `repMin` / `repMax` | Menus シート | 履歴が無い種目で表示する目標レップ範囲 |
+| `defaultSets` | Menus シート | 履歴が無い種目の初期セット数 |
+| `manualWeight` / `manualDelta` | ユーザー操作 | 手動上書き |
 
-## 前処理
-
-1. `last = history[0]`（前回セッション）。無ければ **`no_history`** を返して終了。
-2. `isWarmup = TRUE` のセットを除外して作業セットを取る。
-3. **メインセット重量 `W`** を決める＝作業セット中で最も多く使われた重量（同数なら重い方）。
-   これにより、ドロップセットや1本だけ重い試技があっても基準がぶれない。
-4. `W` と同じ重量のセット群 `setsAtW` を評価対象とする。
-5. `avgRPE` = `setsAtW` に記録されたRPEの平均（記録が無ければ `null`）。
-
-## RPE係数
+## 処理
 
 ```
-avgRPE ≤ 7.0            → factor = 1.5   まだ余裕がある。大きめに伸ばす
-7.0 < avgRPE ≤ 8.5      → factor = 1.0   適正。標準の刻み
-8.5 < avgRPE ≤ 9.5      → factor = 0.5   きつい。刻みを半分に
-9.5 < avgRPE            → factor = 0.0   限界。重量は据え置き
-avgRPE が未記録          → factor = 1.0
+last = history[0]（前回セッション）
+
+履歴が無い場合 → status = 'no_history'
+  ・重量は null（手入力を促す）
+  ・plan は defaultSets 本、レップは repMin
+
+履歴がある場合 → status = 'carry_over'
+  W = 前回のメインセット重量（作業セットの最頻値。同数なら重い方）
+  推奨重量 = W + increment
+
+  plan[i] = {
+    weight : 前回セット i の重量 + increment,   ← セットごとに個別に加算
+    reps   : 前回セット i のレップ（そのまま）,
+    prevWeight, prevReps                        ← UI に「前回 80kg × 10」と表示するため
+  }
 ```
 
-しきい値は Settings シートの `rpeEasyThreshold` / `rpeNormalThreshold` / `rpeHardThreshold` で変更可能。
+セットごとに `+increment` しているのは、ドロップセットのように重量が揃っていない構成でも
+前回の形をそのまま維持するため。全セット同じ重量なら、結果は「全部 +2.5kg」と同じになる。
 
-## 分岐
-
-```
-判定A: setsAtW の全セットが repMax 以上か？
-├─ YES ──→ factor > 0 ?
-│           ├─ YES → status = increase
-│           │        増加量 = round(baseIncrement × factor, weightStep)
-│           │        （0 に丸められた場合は最小刻み weightStep を採用）
-│           │        推奨重量 = W + 増加量
-│           │        目標レップ = repMin（リセット）
-│           └─ NO  → status = hold        （RPEが限界域。重量据え置き）
-│
-└─ NO ───→ 判定B: setsAtW の全セットが repMin 以上か？
-            ├─ YES → status = add_reps
-            │        推奨重量 = W（据え置き）
-            │        目標レップ = min(前回最大レップ + 1, repMax)
-            │
-            └─ NO  → 判定C: repMin 未達が何セッション連続しているか（failStreak）
-                     ├─ failStreak ≥ deloadAfterFails → status = deload
-                     │        推奨重量 = floor(W × (1 − deloadRate), weightStep)
-                     │        目標レップ = repMin
-                     └─ それ以外                      → status = hold
-                              推奨重量 = W（同じ重量で再挑戦）
-```
-
-`failStreak` は `history` を新しい順に辿り、「そのセッションのメインセット重量で `repMin` を全セットクリアできていない」
-が続いた回数。1回でもクリアした時点で打ち切る。
-
-## 丸め
-
-```
-roundToStep(v, step, mode) = ( mode==='floor' ? floor(v/step)
-                             : mode==='ceil'  ? ceil(v/step)
-                             :                  round(v/step) ) × step
-```
-
-- 増量時は `nearest`（最も近い刻み）
-- ディロード時は `floor`（切り下げ＝安全側）。切り下げた結果 `W` 以上になる異常時は `W − step` を採用
+ウォームアップ（`isWarmup = TRUE`）のセットは履歴から除外され、引き継ぎの対象にならない。
 
 ## 手動上書き
 
@@ -90,57 +54,50 @@ roundToStep(v, step, mode) = ( mode==='floor' ? floor(v/step)
 | `manualDelta` 指定 | `finalWeight = recommendedWeight + manualDelta` |
 | どちらも無し | `finalWeight = recommendedWeight` |
 
-UI では `±weightStep` ボタン、`±2×weightStep` のクイックチップ、数値直接入力、
-「提案値に戻す」の4通りで上書きできる。上書きしても提案の根拠文は残るため、判断の材料が消えない。
+確認画面（今回のプラン）では次の操作で上書きできる。
+
+- **± ボタン / 数値入力** … メイン重量を変更する。差分は plan の各セットにも同じだけ反映される
+- **セット数 ± ** … plan の行を増減する（増やすと最後の行を複製）
+- **各行のレップ入力** … そのセットだけレップを変える
 
 ## 出力
 
 ```json
 {
-  "status": "increase | add_reps | hold | deload | no_history",
-  "headline": "増量",
+  "status": "carry_over | no_history",
+  "headline": "前回 +2.5kg",
+  "increment": 2.5,
   "baseWeight": 80,
   "recommendedWeight": 82.5,
   "finalWeight": 82.5,
-  "delta": 2.5,
-  "targetReps": "8〜12",
-  "targetRepMin": 8, "targetRepMax": 12,
-  "recommendedSets": 4,
-  "weightStep": 2.5, "baseIncrement": 2.5,
-  "avgRpe": 8, "rpeFactor": 1, "rpeLabel": "適正",
-  "reason": "前回 2026-09-03 に 80kg × 4セットすべてで上限 12レップを達成しました。…",
-  "lastSummary": { "date": "2026-09-03", "weight": 80, "sets": 4, "reps": [12,12,12,12], "avgRpe": 8, "est1RM": 112 },
-  "deltaOptions": [-5, -2.5, 0, 2.5, 5],
-  "est1RMAtTarget": 104.5,
-  "projectedVolume": 2640
+  "plan": [
+    { "setNo": 1, "weight": 82.5, "reps": 10, "prevWeight": 80, "prevReps": 10 },
+    { "setNo": 2, "weight": 82.5, "reps": 9,  "prevWeight": 80, "prevReps": 9 },
+    { "setNo": 3, "weight": 82.5, "reps": 8,  "prevWeight": 80, "prevReps": 8 }
+  ],
+  "lastSummary": { "date": "2026-09-17", "weight": 80, "sets": 3, "reps": [10,9,8], "avgRpe": 8 },
+  "reason": "前回 2026-09-17 は 80kg × 10/9/8レップ（3セット）でした。…",
+  "est1RMAtTarget": 110,
+  "projectedVolume": 2227.5
 }
 ```
 
-`reason` には「何を根拠に、どう計算して、なぜその数字になったか」を日本語で組み立てて入れている。
-提案をそのまま飲むかどうかをユーザーが判断できるようにするため、UIでは常にこの文を表示する。
+`reason` には根拠を日本語で組み立てて入れており、UI では常に表示する。
 
 ## 動作確認
 
-GASエディタで `testProgression()` を実行すると、シート無しで7ケースの分岐を確認できる。
-実行結果（`baseIncrement=2.5, weightStep=2.5, repMin=8, repMax=12, W=60kg` の場合）：
+GASエディタで `testProgression()` を実行すると、シート無しで4ケースを確認できる。
+実行結果（increment = 2.5kg）:
 
 | ケース | 結果 |
 |---|---|
-| 全セット12レップ / RPE 8 | `increase` 62.5kg（+2.5） |
-| 全セット12レップ / RPE 6.5 | `increase` 65kg（+5、係数1.5） |
-| 全セット12レップ / RPE 9.8 | `hold` 60kg（限界域のため据え置き） |
-| 10/9/9レップ / RPE 8 | `add_reps` 60kg・目標11レップ |
-| 7/6/5レップ（1回目） | `hold` 60kg |
-| 7/6/5レップ（2回連続） | `deload` 52.5kg（−10%を切り下げ） |
-| 履歴なし | `no_history`（手動入力を促す） |
+| 前回 60kg 10/9/8 | 62.5kg / plan 62.5×10, 62.5×9, 62.5×8 |
+| 前回 40kg 12/12/11/10（4セット） | 42.5kg / 4セットのまま引き継ぎ |
+| 前回 60,60,50kg（ドロップ） | 62.5 / 62.5 / 52.5kg に各 +2.5kg |
+| 履歴なし | `no_history`（重量は手入力） |
 
-## 意図的に採用しなかった方式
+## 以前の方式について
 
-| 方式 | 不採用の理由 |
-|---|---|
-| 推定1RMの◯%を提示 | レップ数の記録精度に結果が強く依存する。特に高レップ域でEpley式の誤差が大きい |
-| 毎回固定量アップ（線形） | 中級者以降ですぐ頭打ちになり、失敗の連続でモチベーションを削る |
-| 前回比の自動％増 | 種目ごとの絶対重量差を無視するため、小さい種目で刻みが非現実的になる |
-
-なお `Progression.gs` は入出力が閉じた純粋な関数として実装してあるため、
-別方式を試したい場合は `suggestNextLoad_()` を差し替えるだけで済む。
+v1 ではダブルプログレッション（レップが上限に達したら増量）+ RPE 補正 + ディロード判定を実装していたが、
+「前回のセット数・レップのまま重量だけ上げる」という運用に合わせて v2 で置き換えた。
+RPE は引き続きセット単位で記録でき、`Logs_<姓>` シートに残るが、提案の計算には使っていない。

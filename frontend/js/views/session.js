@@ -1,12 +1,13 @@
-/** session.js — ワークアウト実行中の記録画面 */
+/** session.js — ワークアウト実行中の記録画面（経過時間 + 休憩タイマー + セット記録） */
 import { state, saveDraft, clearDraft } from '../state.js';
 import { api } from '../api.js';
 import { esc, icon, snackbar, confirmDialog, fmtNum, fmtDuration, fmtVolume, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
 import { navigate } from '../router.js';
 import { resetPicking } from './select.js';
+import { restTimerHtml, startTicking, stopTicking, handleRestClick } from '../restTimer.js';
 
-let timerId = null;
+let elapsedId = null;
 
 export function render(root) {
   const draft = state.draft;
@@ -19,22 +20,24 @@ export function render(root) {
   paint(root);
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
-  startTimer();
+  startElapsed();
+  startTicking(() => paintAndRebind(root));
 }
 
 export function teardown() {
-  if (timerId) { clearInterval(timerId); timerId = null; }
+  if (elapsedId) { clearInterval(elapsedId); elapsedId = null; }
+  stopTicking();
 }
 
-function startTimer() {
-  teardown();
+function startElapsed() {
+  if (elapsedId) clearInterval(elapsedId);
   const tick = () => {
     const el = document.querySelector('#elapsed');
-    if (!el) return teardown();
+    if (!el) { clearInterval(elapsedId); elapsedId = null; return; }
     el.textContent = fmtDuration(Date.now() - new Date(state.draft.startTime).getTime());
   };
   tick();
-  timerId = setInterval(tick, 1000);
+  elapsedId = setInterval(tick, 1000);
 }
 
 function paint(root) {
@@ -56,6 +59,8 @@ function paint(root) {
       </div>
     </div>
 
+    ${restTimerHtml()}
+
     ${draft.entries.map((e, ei) => entryCard(e, ei)).join('')}
 
     <div class="md-field" style="margin-top:24px">
@@ -75,13 +80,27 @@ function paint(root) {
   `;
 }
 
+/** 再描画してイベントを貼り直す（休憩タイマーの状態変化などで呼ぶ） */
+function paintAndRebind(root) {
+  root.removeEventListener('click', onClick);
+  root.removeEventListener('input', onInput);
+  paint(root);
+  root.addEventListener('click', onClick);
+  root.addEventListener('input', onInput);
+  startElapsed();
+  startTicking(() => paintAndRebind(root));
+}
+
 function entryCard(e, ei) {
+  const carried = e.suggestion?.status === 'carry_over';
   return `
     <div class="md-card md-card--elevated" data-entry="${ei}">
       <div class="md-card__header">
         <div class="ll-grow">
           <div class="md-card__title">${esc(e.menu)}</div>
-          <div class="md-card__subhead">${esc(e.part)} · 目標 ${esc(e.suggestion.targetReps)} レップ · 提案 ${fmtNum(e.weight)}kg</div>
+          <div class="md-card__subhead">
+            ${esc(e.part)}${carried ? ` · 前回 ${fmtNum(e.suggestion.baseWeight)}kg → 今回 ${fmtNum(e.weight)}kg` : ` · ${fmtNum(e.weight)}kg`}
+          </div>
         </div>
         <button class="md-icon-button md-state" data-act="guide" aria-label="解説">${icon('info')}</button>
       </div>
@@ -159,6 +178,7 @@ function onInput(ev) {
 
 function onClick(ev) {
   const root = ev.currentTarget;
+  if (handleRestClick(ev.target)) return paintAndRebind(root);
   if (ev.target.closest('#finishBtn')) return finish(root);
   if (ev.target.closest('#abortBtn')) return abort();
 
@@ -172,12 +192,13 @@ function onClick(ev) {
 
   if (act === 'addset' || act === 'addwarm') {
     const isWarm = act === 'addwarm';
-    const workNo = entry.sets.filter((s) => !s.isWarmup).length + 1;
-    const lastWork = [...entry.sets].reverse().find((s) => !s.isWarmup);
+    const workSets = entry.sets.filter((s) => !s.isWarmup);
+    const lastWork = workSets[workSets.length - 1];
     entry.sets.push({
-      setNo: isWarm ? 0 : workNo,
+      setNo: isWarm ? 0 : workSets.length + 1,
       weight: isWarm ? Math.round(((entry.weight || 0) * 0.5) / 2.5) * 2.5 : (lastWork?.weight ?? entry.weight),
-      reps: '', rpe: '', isWarmup: isWarm, done: false
+      reps: isWarm ? '' : (lastWork?.reps ?? ''),
+      rpe: '', isWarmup: isWarm
     });
   } else if (act === 'delset' && setIndex >= 0) {
     entry.sets.splice(setIndex, 1);
@@ -186,7 +207,7 @@ function onClick(ev) {
     return;
   }
   saveDraft();
-  paint(root);
+  paintAndRebind(root);
 }
 
 function renumber(entry) {
@@ -225,6 +246,7 @@ async function finish(root) {
       endTime: new Date().toISOString(),
       date: draft.date,
       memo: draft.memo || '',
+      restMinutes: draft.rest?.minutes,
       entries
     });
     state.dashboard = res.dashboard || state.dashboard;

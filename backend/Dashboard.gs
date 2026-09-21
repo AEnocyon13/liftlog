@@ -3,15 +3,15 @@
  */
 
 /**
+ * @param {Object}      user  resolveUser_ の戻り値（実績シートと月間目標の取得元）
  * @param {string|null} month 'YYYY-MM'。null なら今月。
  */
-function buildDashboard_(month) {
+function buildDashboard_(user, month) {
   var tz = getTimezone_();
   var now = new Date();
   var targetMonth = month || Utilities.formatDate(now, tz, 'yyyy-MM');
-  var settings = getSettings_();
 
-  var sessions = readTable_(SHEETS.SESSIONS)
+  var sessions = readTable_(sessionsSheetName_(user.surname), true)
     .map(function (r) {
       return {
         sessionId: String(r.sessionId || ''),
@@ -26,7 +26,7 @@ function buildDashboard_(month) {
     })
     .filter(function (s) { return s.date && s.finished; });
 
-  var logs = readTable_(SHEETS.LOGS).map(function (r) {
+  var logs = readTable_(logsSheetName_(user.surname), true).map(function (r) {
     return {
       date: normDate_(r.date),
       part: String(r.part || '').trim(),
@@ -43,8 +43,9 @@ function buildDashboard_(month) {
   var monthSessions = sessions.filter(function (s) { return inMonth(s.date); });
   var monthLogs = logs.filter(function (r) { return inMonth(r.date); });
 
-  /* --- 達成度 --- */
-  var target = num_(settings.monthlyTargetWorkouts, 12) || 12;
+  /* --- 達成度（目標はユーザーごと） --- */
+  var target = num_(user.monthlyTargetWorkouts, 12) || 12;
+  var targetVolume = num_(user.monthlyTargetVolume, 0) || 0;
   var done = uniq_(monthSessions.map(function (s) { return s.date + '|' + s.sessionId; })).length;
   var rate = target > 0 ? Math.round((done / target) * 1000) / 10 : 0;
 
@@ -152,6 +153,7 @@ function buildDashboard_(month) {
   var restDays = lastDate ? Math.floor((dateOf_(todayStr) - dateOf_(lastDate)) / 86400000) : null;
 
   return {
+    user: user.surname,
     month: targetMonth,
     monthLabel: y + '年' + mo + '月',
     generatedAt: now.toISOString(),
@@ -165,9 +167,9 @@ function buildDashboard_(month) {
       onTrack: done >= expected,
       elapsedDays: elapsedDays,
       daysInMonth: daysInMonth,
-      targetVolume: num_(settings.monthlyTargetVolume, 0) || 0,
-      volumeRate: (settings.monthlyTargetVolume > 0)
-        ? Math.round((totalVolume / settings.monthlyTargetVolume) * 1000) / 10 : null
+      targetVolume: targetVolume,
+      volumeRate: targetVolume > 0
+        ? Math.round((totalVolume / targetVolume) * 1000) / 10 : null
     },
     totals: {
       volume: totalVolume,

@@ -4,9 +4,6 @@
  *   SPREADSHEET_ID : 実績記録用スプレッドシートのID
  *   DOC_ID         : メニュー解説マスターのGoogleドキュメントID
  *   API_KEY        : フロントエンドと共有するシークレットキー（英数32文字程度）
- *
- * 直接ハードコードしたい場合は下の FALLBACK に書いても動くが、
- * リポジトリに push すると漏洩するのでプロパティ利用を強く推奨。
  */
 var FALLBACK = {
   SPREADSHEET_ID: '',
@@ -14,45 +11,60 @@ var FALLBACK = {
   API_KEY: ''
 };
 
+/** 全員で共有するシート */
 var SHEETS = {
-  LOGS: 'Logs',
-  SESSIONS: 'Sessions',
+  USERS: 'Users',
   MENUS: 'Menus',
   SETTINGS: 'Settings'
 };
 
-/** Logs シートの列定義（順序がそのまま列順） */
+/** ユーザーごとに作られるシートの名前 */
+function logsSheetName_(surname)     { return 'Logs_' + surname; }
+function sessionsSheetName_(surname) { return 'Sessions_' + surname; }
+
+/** Users シート（登録ユーザーと個人設定） */
+var USER_COLUMNS = [
+  'surname', 'createdAt', 'lastLoginAt',
+  'monthlyTargetWorkouts', 'monthlyTargetVolume', 'weightIncrement', 'restMinutes', 'memo'
+];
+
+/** Logs_<姓> シートの列定義（1行 = 1セット） */
 var LOG_COLUMNS = [
   'logId', 'sessionId', 'date', 'part', 'menu', 'setNo',
   'weight', 'reps', 'rpe', 'isWarmup', 'volume', 'est1RM', 'memo', 'createdAt'
 ];
 
-/** Sessions シートの列定義 */
+/** Sessions_<姓> シートの列定義（1行 = 1ワークアウト） */
 var SESSION_COLUMNS = [
   'sessionId', 'date', 'startTime', 'endTime', 'durationMin',
-  'parts', 'menus', 'totalSets', 'totalVolume', 'condition', 'memo', 'createdAt'
+  'parts', 'menus', 'totalSets', 'totalVolume', 'restMinutes', 'memo', 'createdAt'
 ];
 
-/** Menus シートの列定義 */
+/** Menus シートの列定義（種目マスター・全員共通） */
 var MENU_COLUMNS = [
-  'part', 'menu', 'equipment', 'repMin', 'repMax',
-  'baseIncrement', 'weightStep', 'defaultSets', 'order', 'active'
+  'part', 'menu', 'equipment', 'repMin', 'repMax', 'defaultSets', 'order', 'active'
 ];
 
-/** Settings シートの既定値（キーが無い場合に使われる） */
+/** Settings シートの既定値（全員共通の既定。個人設定は Users シートが優先） */
 var DEFAULT_SETTINGS = {
-  monthlyTargetWorkouts: 12,      // 月間目標ワークアウト回数
-  monthlyTargetVolume: 0,         // 月間目標総ボリューム(kg)。0なら非表示
-  deloadRate: 0.10,               // 連続失敗時のディロード率
-  deloadAfterFails: 2,            // 何回連続で失敗したらディロードするか
-  defaultRepMin: 8,
-  defaultRepMax: 12,
-  defaultWeightStep: 2.5,
-  rpeEasyThreshold: 7.0,          // これ以下 = まだ余裕 → 増加幅 x1.5
-  rpeNormalThreshold: 8.5,        // これ以下 = 適正   → 増加幅 x1.0
-  rpeHardThreshold: 9.5,          // これ以下 = きつい → 増加幅 x0.5 / 超過は据え置き
+  defaultRepMin: 8,               // 履歴が無いときに表示する目標レップ下限
+  defaultRepMax: 12,              // 同上・上限
+  defaultWeightIncrement: 2.5,    // 前回比で自動的に足す重量(kg)
+  defaultRestMinutes: 3,          // 休憩タイマーの既定値(分)
+  defaultMonthlyTarget: 12,       // 月間目標ワークアウト回数の既定
   timezone: 'Asia/Tokyo'
 };
+
+/** 個人設定（Users シート）の既定値 */
+function defaultUserSettings_() {
+  var s = getSettings_();
+  return {
+    monthlyTargetWorkouts: num_(s.defaultMonthlyTarget, 12),
+    monthlyTargetVolume: 0,
+    weightIncrement: num_(s.defaultWeightIncrement, 2.5),
+    restMinutes: num_(s.defaultRestMinutes, 3)
+  };
+}
 
 function getProp_(key) {
   var v = PropertiesService.getScriptProperties().getProperty(key);
