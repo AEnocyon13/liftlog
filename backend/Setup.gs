@@ -1,8 +1,12 @@
 /**
  * Setup.gs — 初期セットアップ用のユーティリティ
  *
+ * ★ GASエディタの実行プルダウンには「いま開いているファイルの関数」しか出ません。
+ *   ここの関数を実行するときは、左のファイル一覧で Setup.gs を開いてください。
+ *
  * 使い方（GASエディタから1回ずつ実行）:
- *   0. upgradeToV2('姓')    … v1 から更新する場合はこれ1つで移行が完了する
+ *   0. runUpgrade()         … v1 から更新する場合はこれ1つで移行が完了する
+ *                             （下の MY_SURNAME を自分の苗字に書き換えてから実行）
  *   1. generateApiKey()     … APIキーを生成してスクリプトプロパティに保存＋ログ表示
  *   2. setupSpreadsheet()   … Users / Menus / Settings を作成し、種目46件を投入
  *   3. seedGuideDoc()       … 解説ドキュメントに Notion 由来の内容を書き込む
@@ -11,6 +15,23 @@
  * 個別に実行したい場合:
  *   migrateLegacyData('yamada') … 旧 Logs / Sessions を指定ユーザーのシートへ移すだけ
  */
+
+/* ==================================================================
+   ▼▼▼ v1 から更新する人はここだけ書き換えて runUpgrade を実行 ▼▼▼
+   ================================================================== */
+
+/** 既存データの持ち主の苗字（小文字ローマ字）。新規に作る場合は空のままでよい。 */
+var MY_SURNAME = '';
+
+/**
+ * v1 → v2 の移行をまとめて実行する。
+ * GASエディタでは関数に引数を渡せないため、上の MY_SURNAME を使う入口を用意している。
+ */
+function runUpgrade() {
+  return upgradeToV2(MY_SURNAME);
+}
+
+/* ================================================================== */
 
 function generateApiKey() {
   var key = Utilities.getUuid().replace(/-/g, '');
@@ -220,7 +241,7 @@ function upgradeToV2(surname) {
   if (hasLegacy) {
     if (!surname) {
       log.push('⚠ 旧 Logs / Sessions に記録が残っています。' +
-        'upgradeToV2(\'あなたの苗字\') のように苗字を渡して再実行すると、そのユーザーのシートへ移します。');
+        'Setup.gs 冒頭の MY_SURNAME に自分の苗字を書いてから runUpgrade を実行すると、そのユーザーのシートへ移します。');
     } else {
       log.push('旧データの移行 → ' + migrateLegacyData(surname).join(' / '));
     }
