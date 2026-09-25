@@ -27,7 +27,11 @@ export function guideHtml(g) {
 
     ${(g.muscles || []).length ? `
       <h3 class="md-section-header">主働筋</h3>
-      <p class="md-body-large" style="margin:0">${g.muscles.map(esc).join(' · ')}</p>` : ''}
+      <div class="md-chip-set">${g.muscles.map((m) => `<span class="md-chip md-chip--tonal">${esc(m)}</span>`).join('')}</div>` : ''}
+
+    ${(g.assistMuscles || []).length ? `
+      <h3 class="md-section-header">補助筋</h3>
+      <div class="md-chip-set">${g.assistMuscles.map((m) => `<span class="md-chip md-chip--static">${esc(m)}</span>`).join('')}</div>` : ''}
 
     ${g.description ? `
       <h3 class="md-section-header">解説</h3>
@@ -61,6 +65,14 @@ export function guideHtml(g) {
   `;
 }
 
+/** 一覧に出す1行サマリ。解説が無ければ筋肉の情報で補う */
+function summaryOf(g) {
+  const d = (g.description || '').replace(/\s+/g, ' ').trim();
+  if (d) return d.length > 44 ? d.slice(0, 44) + '…' : d;
+  if ((g.muscles || []).length) return '主働筋: ' + g.muscles.join(' · ');
+  return '解説なし';
+}
+
 /** 種目解説の一覧画面 */
 export function render(root) {
   const guides = state.guides || [];
@@ -83,7 +95,7 @@ export function render(root) {
           <span class="md-list-item__leading">${icon('book')}</span>
           <div class="md-list-item__content">
             <div class="md-list-item__headline">${esc(g.menu)}</div>
-            <div class="md-list-item__supporting">${esc((g.description || '解説なし').slice(0, 44))}${(g.description || '').length > 44 ? '…' : ''}</div>
+            <div class="md-list-item__supporting">${esc(summaryOf(g))}</div>
           </div>
           <span class="md-list-item__trailing ll-row ll-row--center" style="gap:4px">
             ${(g.videos || []).length ? `<span class="md-chip md-chip--static" style="height:24px;padding:0 8px">${icon('play', 'icon--sm')}${g.videos.length}</span>` : ''}

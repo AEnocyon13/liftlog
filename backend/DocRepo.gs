@@ -8,6 +8,7 @@
  *   別名: ベンプレ, BP
  *   器具: バーベル
  *   主働筋: 大胸筋 / 三角筋前部 / 上腕三頭筋
+ *   補助筋: 上腕三頭筋 / 三角筋
  *   解説: 肩甲骨を寄せて下制し、みぞおちに落とす。…（複数行OK。行を分けると段落として連結）
  *   ポイント: 肘は45度。手首を寝かせない。
  *   ポイント: ボトムで力を抜かない。
@@ -35,6 +36,8 @@ var LABEL_MAP = {
   '器具': 'equipment',
   '主働筋': 'muscles',
   '対象筋': 'muscles',
+  'ターゲット筋': 'muscles',
+  '補助筋': 'assistMuscles',
   'レップ': 'repRange',
   '推奨レップ': 'repRange'
 };
@@ -112,6 +115,7 @@ function newGuide_(part, menu) {
     aliases: [],
     equipment: '',
     muscles: [],
+    assistMuscles: [],
     repRange: '',
     description: '',
     points: [],
@@ -152,6 +156,9 @@ function applyGuideField_(guide, key, value, para) {
       break;
     case 'muscles':
       splitList_(value).forEach(function (v) { guide.muscles.push(v); });
+      break;
+    case 'assistMuscles':
+      splitList_(value).forEach(function (v) { guide.assistMuscles.push(v); });
       break;
     case 'equipment':
       guide.equipment = value;

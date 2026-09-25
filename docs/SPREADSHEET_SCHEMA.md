@@ -5,7 +5,7 @@
 
 ```
 Users        … 登録ユーザーと個人設定（全員共通）
-Menus        … 種目マスター（全員共通・46種目）
+Menus        … 種目マスター（全員共通・48種目）
 Settings     … 既定値（全員共通）
 Logs_tanaka      … tanaka の実績（1行 = 1セット）
 Sessions_tanaka  … tanaka のワークアウト単位のサマリ
@@ -94,7 +94,7 @@ Sessions_suzuki  … suzuki のサマリ
 
 ## Menus — 種目マスター（全員共通）
 
-初期値は Notion「筋トre」ページから取り込んだ **46種目**（[notion-guide-source.md](notion-guide-source.md)）。
+初期値は Notion「筋トre」の 種目｜Exercises データベースから取り込んだ **48種目**（[notion-guide-source.md](notion-guide-source.md)）。
 部位は 胸 / 背中 / 脚 / 肩 / 腕 / 腹 の6つ。**ここを編集して種目を増減する。**
 
 | 列 | 型 | 既定 | 説明 |

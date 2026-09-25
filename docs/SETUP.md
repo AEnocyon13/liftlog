@@ -69,7 +69,8 @@
 | 関数 | 内容 |
 |---|---|
 | `setupSpreadsheet` | Users / Menus / Settings の3シートを作成し、種目46件と既定設定を投入 |
-| `seedGuideDoc` | 解説ドキュメントに Notion 由来の解説を書き込む ※本文が空のときのみ |
+| `seedGuideDoc` | 解説ドキュメントに Notion 由来の解説（48種目）を書き込む ※本文が空のときのみ |
+| `rewriteGuideDoc` | 同上。**既存の本文を丸ごと置き換える**（入れ直したいときはこちら） |
 | `selfTest` | 読み書きが通るか確認。ログにメニュー数・解説数・登録ユーザーが出れば成功 |
 | `testProgression` | 重量提案ロジックをシート無しで確認（任意） |
 

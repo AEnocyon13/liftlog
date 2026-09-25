@@ -156,28 +156,30 @@ function seedGuideDoc() {
     return;
   }
 
+  writeGuideDoc_(body);
+  doc.saveAndClose();
+  clearGuideCache_();
+  Logger.log('解説を書き込みました。' + guideStats_() + '\n' + doc.getUrl());
+}
+
+/** SEED_GUIDE を本文に流し込む（seedGuideDoc / rewriteGuideDoc の共通処理） */
+function writeGuideDoc_(body) {
   body.appendParagraph('筋トレ メニュー解説マスター')
       .setHeading(DocumentApp.ParagraphHeading.TITLE);
   body.appendParagraph('見出し1 = 部位 / 見出し2 = 種目名 / 本文 = 「ラベル: 内容」の形式で記述します。' +
     '書き方は docs/DOC_FORMAT.md を参照してください。');
 
   var currentPart = '';
-  var withText = 0;
   SEED_GUIDE.forEach(function (g) {
     if (g.part !== currentPart) {
       currentPart = g.part;
       body.appendParagraph(currentPart).setHeading(DocumentApp.ParagraphHeading.HEADING1);
     }
     body.appendParagraph(g.menu).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    if (g.lines.length) withText++;
     g.lines.forEach(function (line) {
       body.appendParagraph(line).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     });
   });
-
-  doc.saveAndClose();
-  clearGuideCache_();
-  Logger.log('解説を書き込みました（' + SEED_GUIDE.length + '種目中 ' + withText + '件に本文あり）: ' + doc.getUrl());
 }
 
 /**
@@ -259,6 +261,41 @@ function upgradeToV2(surname) {
     ' バージョンを「新バージョン」にして再デプロイしてください。');
   Logger.log(log.join('\n'));
   return log.join('\n');
+}
+
+/**
+ * 解説ドキュメントの中身を、SEED_GUIDE の内容で**丸ごと置き換える**。
+ *
+ * seedGuideDoc() は本文が空のときしか書き込まないので、
+ * すでに古い内容が入っているドキュメントを Notion の最新の取り込み結果に
+ * 更新したいときはこちらを使う。
+ *
+ * ⚠ ドキュメントに手で書き足した解説は失われる。実行前に、必要なら
+ *   ファイル > 版履歴 でコピーを残しておくこと（版履歴からは元に戻せる）。
+ */
+function rewriteGuideDoc() {
+  var doc = getDoc_();
+  var body = doc.getBody();
+  var had = body.getText().trim().length;
+  body.clear();
+  writeGuideDoc_(body);
+  doc.saveAndClose();
+  clearGuideCache_();
+  Logger.log((had ? '既存の本文を置き換えました。' : '書き込みました。') +
+    '\n' + guideStats_() + '\n' + doc.getUrl() +
+    '\n\nアプリの 設定 →「解説ドキュメントを再読込」を押すと反映されます。');
+}
+
+function guideStats_() {
+  var withText = SEED_GUIDE.filter(function (g) { return g.lines.length; }).length;
+  var withDesc = SEED_GUIDE.filter(function (g) {
+    return g.lines.some(function (l) { return l.indexOf('解説:') === 0; });
+  }).length;
+  var withVideo = SEED_GUIDE.filter(function (g) {
+    return g.lines.some(function (l) { return l.indexOf('YouTube:') === 0; });
+  }).length;
+  return SEED_GUIDE.length + '種目（解説 ' + withDesc + '件 / 筋肉の情報 ' + withText +
+    '件 / 動画 ' + withVideo + '件）';
 }
 
 /**
