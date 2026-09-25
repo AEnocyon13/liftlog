@@ -2,13 +2,14 @@
  * Setup.gs — 初期セットアップ用のユーティリティ
  *
  * 使い方（GASエディタから1回ずつ実行）:
+ *   0. upgradeToV2('姓')    … v1 から更新する場合はこれ1つで移行が完了する
  *   1. generateApiKey()     … APIキーを生成してスクリプトプロパティに保存＋ログ表示
  *   2. setupSpreadsheet()   … Users / Menus / Settings を作成し、種目46件を投入
  *   3. seedGuideDoc()       … 解説ドキュメントに Notion 由来の内容を書き込む
  *   4. selfTest()           … 一通りの読み書きが通るか確認
  *
- * 旧バージョン（ユーザー分割前）から移行する場合:
- *   migrateLegacyData('yamada') … 既存の Logs / Sessions を指定ユーザーのシートへ移す
+ * 個別に実行したい場合:
+ *   migrateLegacyData('yamada') … 旧 Logs / Sessions を指定ユーザーのシートへ移すだけ
  */
 
 function generateApiKey() {
@@ -51,21 +52,44 @@ function formatDateColumnAsText_(sh, colIndex) {
   sh.getRange(2, colIndex, Math.max(1, sh.getMaxRows() - 1), 1).setNumberFormat('@');
 }
 
+var SETTING_DESCRIPTIONS = {
+  defaultRepMin: '履歴が無い種目で表示する目標レップ下限',
+  defaultRepMax: '同上・上限',
+  defaultWeightIncrement: '前回比で自動的に足す重量(kg)。個人設定で上書きできる',
+  defaultRestMinutes: '休憩タイマーの既定値(分)。個人設定で上書きできる',
+  defaultMonthlyTarget: '月間目標ワークアウト回数の既定。個人設定で上書きできる',
+  timezone: 'タイムゾーン'
+};
+
 function seedSettings_(ss) {
   var sh = ss.getSheetByName(SHEETS.SETTINGS);
   if (sh.getLastRow() > 1) return;
-  var descriptions = {
-    defaultRepMin: '履歴が無い種目で表示する目標レップ下限',
-    defaultRepMax: '同上・上限',
-    defaultWeightIncrement: '前回比で自動的に足す重量(kg)。個人設定で上書きできる',
-    defaultRestMinutes: '休憩タイマーの既定値(分)。個人設定で上書きできる',
-    defaultMonthlyTarget: '月間目標ワークアウト回数の既定。個人設定で上書きできる',
-    timezone: 'タイムゾーン'
-  };
   var rows = Object.keys(DEFAULT_SETTINGS).map(function (k) {
-    return [k, DEFAULT_SETTINGS[k], descriptions[k] || ''];
+    return [k, DEFAULT_SETTINGS[k], SETTING_DESCRIPTIONS[k] || ''];
   });
   sh.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
+/**
+ * 既存の Settings シートに、v2 で増えたキーだけを追記する（既存の値は書き換えない）。
+ * @return {{added: string[], stale: string[]}} 追記したキーと、v2 では使われていない残存キー
+ */
+function refreshSettingsKeys_(ss) {
+  var sh = ss.getSheetByName(SHEETS.SETTINGS);
+  var have = {};
+  readTable_(SHEETS.SETTINGS).forEach(function (r) {
+    var k = String(r.key || '').trim();
+    if (k) have[k] = true;
+  });
+  var added = [];
+  Object.keys(DEFAULT_SETTINGS).forEach(function (k) {
+    if (have[k]) return;
+    sh.appendRow([k, DEFAULT_SETTINGS[k], SETTING_DESCRIPTIONS[k] || '']);
+    added.push(k);
+  });
+  var stale = Object.keys(have).filter(function (k) { return DEFAULT_SETTINGS[k] === undefined; });
+  _settingsCache = null;
+  return { added: added, stale: stale };
 }
 
 /** 種目マスター（SeedData.gs / Notion「筋トre」由来の46種目） */
@@ -115,6 +139,79 @@ function seedGuideDoc() {
   doc.saveAndClose();
   clearGuideCache_();
   Logger.log('解説を書き込みました（' + SEED_GUIDE.length + '種目中 ' + withText + '件に本文あり）: ' + doc.getUrl());
+}
+
+/**
+ * v1 から v2 への移行をまとめて行う。**更新時はこれを1回実行すれば足りる。**
+ *
+ *   1. 列構成が変わった Menus / Settings を作り直す（旧シートは *_v1backup にリネームして保全）
+ *   2. Users シートを作る
+ *   3. 旧 Logs / Sessions があれば、指定された苗字のシートへ移す
+ *
+ * @param {string} surname 既存データの持ち主の苗字（小文字ローマ字）。
+ *                         旧データが無い場合は省略できる。
+ */
+function upgradeToV2(surname) {
+  var ss = getSpreadsheet_();
+  var stamp = Utilities.formatDate(new Date(), getTimezone_(), 'yyyyMMdd');
+  var log = [];
+
+  // --- 1. 列構成が変わったシートを作り直す ---
+  var menusSh = ss.getSheetByName(SHEETS.MENUS);
+  if (!menusSh) {
+    log.push('Menus: 新規作成');
+  } else {
+    var header = menusSh.getRange(1, 1, 1, Math.max(1, menusSh.getLastColumn())).getValues()[0]
+      .map(function (v) { return String(v).trim(); }).filter(String);
+    if (header.join('|') === MENU_COLUMNS.join('|')) {
+      log.push('Menus: 列構成は最新（そのまま）');
+    } else {
+      var backup = SHEETS.MENUS + '_v1backup_' + stamp;
+      if (ss.getSheetByName(backup)) ss.deleteSheet(ss.getSheetByName(backup));
+      menusSh.setName(backup);
+      log.push('Menus: 旧シートを ' + backup + ' にリネームして作り直し');
+    }
+  }
+
+  ensureSheet_(ss, SHEETS.USERS, USER_COLUMNS);
+  ensureSheet_(ss, SHEETS.MENUS, MENU_COLUMNS);
+  ensureSheet_(ss, SHEETS.SETTINGS, ['key', 'value', 'description']);
+  _settingsCache = null;
+  _menuCache = null;
+
+  seedSettings_(ss);
+  seedMenus_(ss);
+  log.push('種目: ' + readMenus_(true).length + '件');
+
+  // Settings は列構成が v1 と同じなので、増えたキーだけを追記する（既存の値は保持）
+  var keys = refreshSettingsKeys_(ss);
+  if (keys.added.length) log.push('Settings: キーを追加 → ' + keys.added.join(', '));
+  if (keys.stale.length) {
+    log.push('Settings: v2 では使わない行が残っています（消して構いません） → ' + keys.stale.join(', '));
+  }
+
+  // --- 2. 旧 Logs / Sessions の移行 ---
+  var hasLegacy = ['Logs', 'Sessions'].some(function (n) {
+    var sh = ss.getSheetByName(n);
+    return sh && sh.getLastRow() > 1;
+  });
+  if (hasLegacy) {
+    if (!surname) {
+      log.push('⚠ 旧 Logs / Sessions に記録が残っています。' +
+        'upgradeToV2(\'あなたの苗字\') のように苗字を渡して再実行すると、そのユーザーのシートへ移します。');
+    } else {
+      log.push('旧データの移行 → ' + migrateLegacyData(surname).join(' / '));
+    }
+  } else if (surname) {
+    var s = assertSurname_(normalizeSurname_(surname));
+    if (!findUser_(s)) { createUser_(s); log.push('ユーザー ' + s + ' を登録しました'); }
+  }
+
+  log.push('登録ユーザー: ' + JSON.stringify(listUserNames_()));
+  log.push('\n完了しました。次は GASエディタの「デプロイ」→「デプロイを管理」→ 鉛筆 →' +
+    ' バージョンを「新バージョン」にして再デプロイしてください。');
+  Logger.log(log.join('\n'));
+  return log.join('\n');
 }
 
 /**

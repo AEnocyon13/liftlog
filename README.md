@@ -94,7 +94,8 @@ workout-app/
 │   └── Setup.gs                 初期セットアップ / セルフテスト
 │
 └── docs/
-    ├── SETUP.md                 セットアップとデプロイ手順（ここから読む）
+    ├── SETUP.md                 セットアップとデプロイ手順（新規に作る場合はここから）
+    ├── UPGRADE.md               v1 から v2 への更新手順（既に運用中ならこちら）
     ├── DESIGN.md                デザイン仕様（Material Design 3 / カラートークン）
     ├── notion-guide-source.md   Notion から取り込んだ種目マスターの原文
     ├── SPREADSHEET_SCHEMA.md    シート定義
@@ -105,9 +106,12 @@ workout-app/
 
 ## セットアップ
 
-[docs/SETUP.md](docs/SETUP.md) の手順に沿って、
-① スプレッドシートとドキュメントを作る → ② GASにコードを貼ってデプロイ → ③ フロントの設定画面にURLとキーを入力、
-の3ステップで動きます。
+**新規に作る場合** … [docs/SETUP.md](docs/SETUP.md) の手順に沿って、
+① スプレッドシートとドキュメントを作る → ② GASにコードを貼ってデプロイ → ③ アプリの設定画面にURLとキーを入力
+→ ④ 苗字でログイン、の4ステップで動きます。
+
+**v1 から更新する場合** … [docs/UPGRADE.md](docs/UPGRADE.md) を参照してください。
+スプレッドシートもドキュメントも作り直さず、`upgradeToV2('姓')` を1回実行するだけで移行できます。
 
 ## ローカルで動かす
 
