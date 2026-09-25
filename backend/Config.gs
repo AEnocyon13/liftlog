@@ -22,9 +22,13 @@ var SHEETS = {
 function logsSheetName_(surname)     { return 'Logs_' + surname; }
 function sessionsSheetName_(surname) { return 'Sessions_' + surname; }
 
-/** Users シート（登録ユーザーと個人設定） */
+/**
+ * Users シート（登録ユーザーと個人設定）
+ * 列を増やすときは末尾に足すこと。既存シートには upgradeToV2() が不足分を追記する。
+ * 読み書きは常に「シートの実際のヘッダ」基準で行うため、並び順が違っても壊れない。
+ */
 var USER_COLUMNS = [
-  'surname', 'createdAt', 'lastLoginAt',
+  'surname', 'displayName', 'pinHash', 'pinSalt', 'createdAt', 'lastLoginAt',
   'monthlyTargetWorkouts', 'monthlyTargetVolume', 'weightIncrement', 'restMinutes', 'memo'
 ];
 
@@ -80,6 +84,23 @@ function getSpreadsheet_() {
 function getDoc_() {
   return DocumentApp.openById(getProp_('DOC_ID'));
 }
+
+/**
+ * セッショントークンの署名に使う秘密鍵。無ければ自動生成して保存する。
+ * これを変えると、発行済みのトークンはすべて無効になる（全員が再ログイン）。
+ */
+function getTokenSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var v = props.getProperty('TOKEN_SECRET');
+  if (!v) {
+    v = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    props.setProperty('TOKEN_SECRET', v);
+  }
+  return v;
+}
+
+/** トークンの有効期間（日） */
+var TOKEN_TTL_DAYS = 30;
 
 function getTimezone_() {
   try {

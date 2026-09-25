@@ -34,14 +34,15 @@ ID も URL も API キーもそのまま使えます。中身の一部だけを�
 
 [script.google.com](https://script.google.com/) で「LiftLog API」プロジェクトを開きます。
 
-`backend/` の**10ファイルすべて**を、同じ名前で貼り替えてください。
-**`Users.gs` と `SeedData.gs` は v2 で新しく増えたファイル**なので、左の「ファイル」＋ボタンから
+`backend/` の**11ファイルすべて**を、同じ名前で貼り替えてください。
+**`Auth.gs` / `Users.gs` / `SeedData.gs` は v2 で新しく増えたファイル**なので、左の「ファイル」＋ボタンから
 新規作成（種類は「スクリプト」）します。
 
 ```
 appsscript.json   ← マニフェスト（歯車 → 「appsscript.json をエディタで表示する」にチェック）
 Code.gs
 Config.gs
+Auth.gs         ★新規（PIN認証・トークン）
 Users.gs        ★新規
 SheetRepo.gs
 DocRepo.gs
@@ -53,7 +54,7 @@ Setup.gs
 
 ### 確認
 
-- [ ] 左のファイル一覧がちょうど上の10個になっている
+- [ ] 左のファイル一覧がちょうど上の11個になっている
 - [ ] `Code.gs` の上のほうに `login:` という行がある（無ければ貼り替えが効いていません）
 - [ ] **古いファイルが残っていない**
 
@@ -91,7 +92,7 @@ function runUpgrade() {
 1. `Menus` を作り直す（旧シートは `Menus_v1backup_日付` にリネームして保全）
 2. 種目46件を投入
 3. `Settings` に v2 で増えたキーを追記（既存の値は書き換えません）
-4. `Users` シートを作成
+4. `Users` シートを作成し、増えた列（`displayName` / `pinHash` / `pinSalt`）を追記
 5. 旧 `Logs` / `Sessions` の記録を `Logs_yamada` / `Sessions_yamada` へ移し、
    旧シートを `Logs_legacy` / `Sessions_legacy` にリネーム
 
@@ -107,8 +108,10 @@ Menus: 旧シートを Menus_v1backup_20260925 にリネームして作り直し
 種目: 46件
 Settings: キーを追加 → defaultRepMin, defaultRepMax, defaultWeightIncrement, defaultRestMinutes, defaultMonthlyTarget, timezone
 Settings: v2 では使わない行が残っています（消して構いません） → monthlyTargetWorkouts, deloadRate, rpeEasyThreshold
+Users: 列を追加 → displayName, pinHash, pinSalt
 旧データの移行 → Logs: 120行 / Sessions: 14行
 登録ユーザー: ["yamada"]
+PIN未設定: yamada → 次回ログイン時にアプリ上で設定できます
 
 完了しました。次は GASエディタの「デプロイ」→…
 ```
@@ -157,6 +160,10 @@ Menus_v1backup_…  Logs_legacy  Sessions_legacy
 
 成功したら [アプリ](https://aenocyon13.github.io/liftlog/) を開き直して、苗字を入れてログインしてください。
 
+**既に登録済みの人は、初回だけ「PINを設定してください」と表示されます。**
+氏名（任意）と4桁PINを決めれば、それ以降は PIN でログインできます。記録はそのまま残ります。
+他の人の記録を見たいときは、その人の苗字を入れて「覗き見する（閲覧のみ）」を選んでください。
+
 ---
 
 ## 6. 種目の解説を入れ替える（任意）
@@ -188,6 +195,8 @@ Notion から取り込んだ46種目に入れ替えられます。**ドキュメ
 | ログインできるが記録が空 | 旧データの移行時に渡した苗字と、ログインに使った苗字が違う可能性があります |
 | 途中で失敗した | `upgradeToV2` は何度実行しても安全です。原因を直してもう一度実行してください |
 | 部位が「胸トレ」ではなく「胸」になっている | v2 の仕様です。`Menus` シートの `part` 列で好きな名前に変えられます |
+| `verifyPin_ is not defined` などのエラー | `Auth.gs` を作成していません |
+| PINを忘れた | Users シートで該当行の `pinHash` / `pinSalt` を空にすると、次回ログインで再設定できます |
 
 ---
 

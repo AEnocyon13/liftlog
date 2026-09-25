@@ -1,9 +1,10 @@
 /** settings.js — ユーザー / 表示テーマ / 接続設定 / トレーニング設定 */
-import { state, logout, getUser, rememberRestMinutes } from '../state.js';
+import { state, logout, getUser, getMode, canEdit, rememberRestMinutes } from '../state.js';
 import { api, getConfig, setConfig } from '../api.js';
 import { esc, icon, snackbar, confirmDialog, fmtNum } from '../ui.js';
 import { getTheme, setTheme, THEMES } from '../theme.js';
 import { navigate } from '../router.js';
+import { resetLogin } from './login.js';
 import { bootstrap } from '../app.js';
 
 export function render(root) {
@@ -12,6 +13,8 @@ export function render(root) {
   const u = state.user || {};
   const theme = getTheme();
   const surname = getUser();
+  const editable = canEdit();
+  const peeking = Boolean(surname) && getMode() === 'peek';
 
   root.innerHTML = `
     ${surname ? `
@@ -20,17 +23,45 @@ export function render(root) {
         <div class="md-list-item md-list-item--static" style="margin:0;background:transparent;padding:0">
           <span class="md-list-item__leading">${icon('person')}</span>
           <div class="md-list-item__content">
-            <div class="md-list-item__headline">${esc(surname)}</div>
-            <div class="md-list-item__supporting">記録は Logs_${esc(surname)} に保存されています</div>
+            <div class="md-list-item__headline">${esc(u.displayName || surname)}</div>
+            <div class="md-list-item__supporting">
+              ${esc(surname)} · 記録は Logs_${esc(surname)} に保存されています
+            </div>
           </div>
+          ${peeking ? `<span class="md-chip md-chip--peek">${icon('eye', 'icon--sm')}覗き見中</span>` : ''}
         </div>
-        <button class="md-button md-button--outlined md-button--block md-state" id="switchUser" style="margin-top:12px">
+        ${peeking ? `
+          <a class="md-button md-button--filled md-button--block md-state" href="#/login" style="margin-top:12px">
+            ${icon('lock')}PINを入力して本人としてログイン
+          </a>` : ''}
+        <button class="md-button md-button--outlined md-button--block md-state" id="switchUser" style="margin-top:8px">
           ${icon('logout')}別の苗字に切り替える
         </button>
       </div>
 
-      <h2 class="md-section-header">トレーニング設定（${esc(surname)} さん）</h2>
+      ${editable ? `
+        <h2 class="md-section-header">PIN</h2>
+        <div class="md-card md-card--elevated">
+          <div class="md-field">
+            <input class="md-field__input ll-pin" id="curPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+            <label class="md-field__label" for="curPin">現在のPIN</label>
+          </div>
+          <div class="md-field">
+            <input class="md-field__input ll-pin" id="newPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+            <label class="md-field__label" for="newPin">新しいPIN（数字4桁）</label>
+          </div>
+          <button class="md-button md-button--tonal md-button--block md-state" id="changePin">
+            ${icon('lock')}PINを変更する
+          </button>
+          <p class="md-body-small on-surface-variant" style="margin-bottom:0">
+            忘れた場合は、スプレッドシートの Users シートで該当行の pinHash / pinSalt を空にすると再設定できます。
+          </p>
+        </div>` : ''}
+
+      <h2 class="md-section-header">トレーニング設定（${esc(u.displayName || surname)} さん）</h2>
       <div class="md-card md-card--elevated">
+        ${peeking ? `<div class="ll-peek-notice">${icon('eye', 'icon--sm')}覗き見中は変更できません</div>` : ''}
+        ${editable ? userTextField('displayName', '氏名', u.displayName || surname) : ''}
         ${userField('weightIncrement', '自動で足す重量 (kg)', u.weightIncrement, 0.25, 20, 0.25,
                     '前回と同じセット数・レップのまま、この分だけ重量を上げて提案します')}
         ${userField('restMinutes', '休憩タイマーの既定 (分)', u.restMinutes, 1, 15, 1,
@@ -134,6 +165,7 @@ function bind(root) {
     });
     if (!ok) return;
     logout();
+    resetLogin();
     navigate('/login');
   });
 
@@ -165,7 +197,8 @@ function bind(root) {
   root.addEventListener('change', async (ev) => {
     const el = ev.target.closest('[data-user-setting], [data-setting]');
     if (!el) return;
-    const value = Number(el.value);
+    const key = el.dataset.userSetting || el.dataset.setting;
+    const value = key === 'displayName' ? el.value.trim() : Number(el.value);
     try {
       if (el.dataset.userSetting) {
         const res = await api.saveUserSetting(el.dataset.userSetting, value);
@@ -180,6 +213,22 @@ function bind(root) {
         state.settings = res.settings;
         snackbar(`${el.dataset.setting} を ${fmtNum(value, 2)} に更新しました`, 'ok');
       }
+    } catch (err) { snackbar(err.message, 'err'); }
+  });
+
+  root.querySelectorAll('.ll-pin').forEach((el) => {
+    el.addEventListener('input', () => { el.value = el.value.replace(/[^0-9]/g, '').slice(0, 4); });
+  });
+
+  root.querySelector('#changePin')?.addEventListener('click', async () => {
+    const currentPin = root.querySelector('#curPin').value;
+    const newPin = root.querySelector('#newPin').value;
+    if (!/^\d{4}$/.test(newPin)) { snackbar('新しいPINは数字4桁で入力してください', 'err'); return; }
+    try {
+      await api.changePin(currentPin, newPin);
+      root.querySelector('#curPin').value = '';
+      root.querySelector('#newPin').value = '';
+      snackbar('PINを変更しました', 'ok');
     } catch (err) { snackbar(err.message, 'err'); }
   });
 
@@ -215,11 +264,19 @@ const numField = (attr, key, label, value, min, max, step, support) => {
   return `
     <div class="md-field">
       <input class="md-field__input num" type="number" id="${id}" ${attr}="${esc(key)}"
-             min="${min}" max="${max}" step="${step}" value="${value ?? ''}">
+             min="${min}" max="${max}" step="${step}" value="${value ?? ''}"
+             ${canEdit() ? '' : 'disabled'}>
       <label class="md-field__label" for="${id}">${esc(label)}</label>
       ${support ? `<span class="md-field__support">${esc(support)}</span>` : ''}
     </div>`;
 };
+
+const userTextField = (key, label, value) => `
+  <div class="md-field">
+    <input class="md-field__input" type="text" id="set-${key}" data-user-setting="${esc(key)}"
+           maxlength="40" value="${esc(value ?? '')}" ${canEdit() ? '' : 'disabled'}>
+    <label class="md-field__label" for="set-${key}">${esc(label)}</label>
+  </div>`;
 
 const userField   = (k, l, v, min, max, step, support = '') => numField('data-user-setting', k, l, v, min, max, step, support);
 const globalField = (k, l, v, min, max, step, support = '') => numField('data-setting', k, l, v, min, max, step, support);

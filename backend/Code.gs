@@ -7,30 +7,36 @@
  *          Content-Type は必ず "text/plain;charset=utf-8" にすること。
  *          （application/json にすると CORS プリフライトが飛び、GAS が対応できず失敗する）
  *
- * 認証は2段構え:
- *   1. API_KEY … クライアントの識別（共有シークレット）
- *   2. user    … 苗字によるデータの切り分け。requiresUser の action では必須。
+ * 認証は3段構え:
+ *   1. API_KEY … クライアントの識別（共有シークレット）。全 action に必須
+ *   2. user    … 苗字によるデータの切り分け。requiresUser の action に必須
+ *   3. token   … PINログインで発行される書き込み権限。requiresAuth の action に必須。
+ *                覗き見モードではトークンが無いので、書き込み系はここで弾かれる。
  *
  * レスポンスは常に 200 で返し、成否は body の ok フラグで表す。
  */
 
 function getRoutes_() {
+  // write        … POST 専用
+  // requiresUser … payload に苗字が必要
+  // requiresAuth … PINログインで得たトークンが必要（＝覗き見では実行できない）
   return {
-    ping:            { fn: api_ping_,            write: false, requiresUser: false },
-    login:           { fn: api_login_,           write: true,  requiresUser: false },
-    listUsers:       { fn: api_listUsers_,       write: false, requiresUser: false },
-    getBootstrap:    { fn: api_getBootstrap_,    write: false, requiresUser: true  },
-    getMenus:        { fn: api_getMenus_,        write: false, requiresUser: false },
-    getGuides:       { fn: api_getGuides_,       write: false, requiresUser: false },
-    getSuggestion:   { fn: api_getSuggestion_,   write: false, requiresUser: true  },
-    getHistory:      { fn: api_getHistory_,      write: false, requiresUser: true  },
-    getDashboard:    { fn: api_getDashboard_,    write: false, requiresUser: true  },
-    startSession:    { fn: api_startSession_,    write: true,  requiresUser: true  },
-    finishSession:   { fn: api_finishSession_,   write: true,  requiresUser: true  },
-    deleteSession:   { fn: api_deleteSession_,   write: true,  requiresUser: true  },
-    saveUserSetting: { fn: api_saveUserSetting_, write: true,  requiresUser: true  },
-    saveSetting:     { fn: api_saveSetting_,     write: true,  requiresUser: false },
-    upsertMenu:      { fn: api_upsertMenu_,      write: true,  requiresUser: false }
+    ping:            { fn: api_ping_,            write: false, requiresUser: false, requiresAuth: false },
+    login:           { fn: api_login_,           write: true,  requiresUser: false, requiresAuth: false },
+    listUsers:       { fn: api_listUsers_,       write: false, requiresUser: false, requiresAuth: false },
+    getBootstrap:    { fn: api_getBootstrap_,    write: false, requiresUser: true,  requiresAuth: false },
+    getMenus:        { fn: api_getMenus_,        write: false, requiresUser: false, requiresAuth: false },
+    getGuides:       { fn: api_getGuides_,       write: false, requiresUser: false, requiresAuth: false },
+    getSuggestion:   { fn: api_getSuggestion_,   write: false, requiresUser: true,  requiresAuth: false },
+    getHistory:      { fn: api_getHistory_,      write: false, requiresUser: true,  requiresAuth: false },
+    getDashboard:    { fn: api_getDashboard_,    write: false, requiresUser: true,  requiresAuth: false },
+    startSession:    { fn: api_startSession_,    write: true,  requiresUser: true,  requiresAuth: true  },
+    finishSession:   { fn: api_finishSession_,   write: true,  requiresUser: true,  requiresAuth: true  },
+    deleteSession:   { fn: api_deleteSession_,   write: true,  requiresUser: true,  requiresAuth: true  },
+    saveUserSetting: { fn: api_saveUserSetting_, write: true,  requiresUser: true,  requiresAuth: true  },
+    changePin:       { fn: api_changePin_,       write: true,  requiresUser: true,  requiresAuth: true  },
+    saveSetting:     { fn: api_saveSetting_,     write: true,  requiresUser: true,  requiresAuth: true  },
+    upsertMenu:      { fn: api_upsertMenu_,      write: true,  requiresUser: true,  requiresAuth: true  }
   };
 }
 
@@ -50,6 +56,7 @@ function handleRequest_(e, method) {
 
     var payload = req.payload || {};
     var user = route.requiresUser ? resolveUser_(payload) : null;
+    if (route.requiresAuth) assertCanWrite_(payload, user);
     var data = route.fn(payload, user);
     return jsonOut_({ ok: true, data: data });
 
@@ -116,33 +123,86 @@ function api_ping_() {
 }
 
 /**
- * ログイン / 新規登録
- * payload: { surname, confirmCreate? }
- *   未登録の苗字で confirmCreate が無いときは registered:false を返すだけで、
- *   シートは作らない。フロントで「新規登録しますか？」を確認してから
- *   confirmCreate:true で再送する。
+ * ログイン / 新規登録 / PIN設定
+ *
+ * payload の組み合わせで分岐する。
+ *   { surname }                                 … 状態を問い合わせる（未登録か、PIN未設定か）
+ *   { surname, mode:'peek' }                    … 覗き見（閲覧のみ）。トークンは発行しない
+ *   { surname, pin }                            … 本人としてログイン。トークンを発行する
+ *   { surname, confirmCreate:true, displayName, pin } … 新規登録してログイン
+ *   { surname, newPin }                         … PIN未設定の既存ユーザーがPINを決めてログイン
  */
 function api_login_(payload) {
   requireFields_(payload, ['surname']);
   var surname = assertSurname_(normalizeSurname_(payload.surname));
   var user = findUser_(surname);
+  var peek = String(payload.mode || '') === 'peek';
 
+  /* --- 未登録 --- */
   if (!user) {
     if (!payload.confirmCreate) {
-      return { surname: surname, registered: false, created: false, needsConfirm: true };
+      return { surname: surname, registered: false, needsConfirm: true };
     }
-    user = createUser_(surname);
-    return { surname: surname, registered: true, created: true, user: publicUser_(user) };
+    requireFields_(payload, ['displayName', 'pin']);
+    user = createUser_(surname, payload.displayName, payload.pin);
+    return loginResult_(user, true, false);
   }
 
+  /* --- 覗き見（PIN不要・閲覧のみ） --- */
+  if (peek) {
+    return {
+      surname: surname, registered: true, created: false, mode: 'peek',
+      user: publicUser_(user)
+    };
+  }
+
+  /* --- PIN未設定の既存ユーザー --- */
+  if (!userHasPin_(user)) {
+    if (!payload.newPin) {
+      return { surname: surname, registered: true, needsPinSetup: true, user: publicUser_(user) };
+    }
+    user = setUserPin_(user, payload.newPin);
+    if (payload.displayName) user = saveUserSetting_(user, 'displayName', payload.displayName);
+    return loginResult_(user, false, true);
+  }
+
+  /* --- 通常のPINログイン --- */
+  if (!payload.pin) {
+    return { surname: surname, registered: true, needsPin: true, user: publicUser_(user) };
+  }
+  verifyPin_(user, payload.pin);
+  return loginResult_(user, false, false);
+}
+
+function loginResult_(user, created, pinSet) {
   touchUser_(user);
-  return { surname: surname, registered: true, created: false, user: publicUser_(user) };
+  var t = issueToken_(user.surname);
+  return {
+    surname: user.surname,
+    registered: true,
+    created: Boolean(created),
+    pinSet: Boolean(pinSet),
+    mode: 'auth',
+    token: t.token,
+    expiresAt: t.expiresAt,
+    user: publicUser_(user)
+  };
+}
+
+/** payload: { user, token, currentPin, newPin } */
+function api_changePin_(payload, user) {
+  requireFields_(payload, ['currentPin', 'newPin']);
+  verifyPin_(user, payload.currentPin);
+  setUserPin_(user, payload.newPin);
+  return { ok: true };
 }
 
 /** 内部フィールド（_row）を落として返す */
 function publicUser_(user) {
   return {
     surname: user.surname,
+    displayName: user.displayName,
+    hasPin: userHasPin_(user),
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
     monthlyTargetWorkouts: user.monthlyTargetWorkouts,
@@ -152,9 +212,9 @@ function publicUser_(user) {
   };
 }
 
-/** ログイン画面の候補表示用（苗字のみ） */
+/** ログイン画面の候補表示用（苗字・氏名・PINの有無） */
 function api_listUsers_() {
-  return { users: listUserNames_() };
+  return { users: listUsersPublic_() };
 }
 
 /** 起動時に必要なものを1回でまとめて返す */
@@ -218,7 +278,7 @@ function api_deleteSession_(payload, user) {
   return deleteSession_(user, String(payload.sessionId));
 }
 
-/** payload: { user, key, value } — 個人設定（月間目標・増量幅・休憩時間） */
+/** payload: { user, token, key, value } — 個人設定（氏名・月間目標・増量幅・休憩時間） */
 function api_saveUserSetting_(payload, user) {
   requireFields_(payload, ['key']);
   var updated = saveUserSetting_(user, String(payload.key), payload.value);

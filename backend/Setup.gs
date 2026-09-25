@@ -47,6 +47,24 @@ function ensureSheet_(ss, name, columns) {
   return sh;
 }
 
+/**
+ * 既存シートのヘッダに、不足している列だけを末尾に追記する。
+ * 既存データを動かさずに列を増やせる（Users シートの拡張に使う）。
+ * @return {string[]} 追記した列名
+ */
+function ensureHeaderColumns_(ss, name, columns) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) return [];
+  var width = Math.max(1, sh.getLastColumn());
+  var header = sh.getRange(1, 1, 1, width).getValues()[0].map(function (v) { return String(v).trim(); });
+  var missing = columns.filter(function (c) { return header.indexOf(c) < 0; });
+  if (!missing.length) return [];
+  sh.getRange(1, header.filter(String).length + 1, 1, missing.length).setValues([missing]);
+  sh.getRange(1, 1, 1, header.filter(String).length + missing.length)
+    .setFontWeight('bold').setBackground('#013E37').setFontColor('#FFEFB3');
+  return missing;
+}
+
 function formatDateColumnAsText_(sh, colIndex) {
   if (!sh || colIndex < 1) return;
   sh.getRange(2, colIndex, Math.max(1, sh.getMaxRows() - 1), 1).setNumberFormat('@');
@@ -179,6 +197,10 @@ function upgradeToV2(surname) {
   _settingsCache = null;
   _menuCache = null;
 
+  // Users は列が増えることがあるので、不足分だけ末尾に足す（既存の行は動かさない）
+  var addedCols = ensureHeaderColumns_(ss, SHEETS.USERS, USER_COLUMNS);
+  if (addedCols.length) log.push('Users: 列を追加 → ' + addedCols.join(', '));
+
   seedSettings_(ss);
   seedMenus_(ss);
   log.push('種目: ' + readMenus_(true).length + '件');
@@ -207,7 +229,11 @@ function upgradeToV2(surname) {
     if (!findUser_(s)) { createUser_(s); log.push('ユーザー ' + s + ' を登録しました'); }
   }
 
+  var noPin = listUsersPublic_().filter(function (u) { return !u.hasPin; }).map(function (u) { return u.surname; });
   log.push('登録ユーザー: ' + JSON.stringify(listUserNames_()));
+  if (noPin.length) {
+    log.push('PIN未設定: ' + noPin.join(', ') + ' → 次回ログイン時にアプリ上で設定できます');
+  }
   log.push('\n完了しました。次は GASエディタの「デプロイ」→「デプロイを管理」→ 鉛筆 →' +
     ' バージョンを「新バージョン」にして再デプロイしてください。');
   Logger.log(log.join('\n'));
@@ -249,7 +275,8 @@ function selfTest() {
   out.push('menus: ' + readMenus_(true).length + '件');
   out.push('guides: ' + readGuides_().length + '件');
   out.push('settings: ' + JSON.stringify(getSettings_(true)));
-  out.push('users: ' + JSON.stringify(listUserNames_()));
+  out.push('users: ' + JSON.stringify(listUsersPublic_()));
+  out.push('トークン検証: ' + (readToken_(issueToken_('testuser').token) === 'testuser' ? 'OK' : 'NG'));
 
   var s = normalizeSurname_('TestUser');
   out.push('苗字の正規化 "TestUser" → "' + s + '" (有効: ' + SURNAME_RE.test(s) + ')');

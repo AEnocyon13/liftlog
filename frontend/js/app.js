@@ -1,6 +1,6 @@
 /** app.js — 起動・ルート定義・初期データ読み込み */
 import { api, isConfigured } from './api.js';
-import { state, loadDraft, getUser, setUser } from './state.js';
+import { state, loadDraft, getUser, getMode, canEdit, logout } from './state.js';
 import { initOverlayEvents, snackbar, $ } from './ui.js';
 import { initTheme } from './theme.js';
 import { defineRoutes, startRouter, navigate, handleRoute, currentPath } from './router.js';
@@ -14,16 +14,19 @@ import * as dashboard from './views/dashboard.js';
 import * as guide from './views/guide.js';
 import * as settings from './views/settings.js';
 
-/** requiresUser のルートは、ログインしていなければ /login に飛ばす */
+/**
+ * requiresUser … ログインしていなければ /login へ
+ * requiresAuth … 覗き見モードでは開けない（PINログインが必要）
+ */
 defineRoutes({
-  '/login':     { title: 'ログイン',       tab: '',          view: login.render,      requiresUser: false },
-  '/home':      { title: 'LiftLog',        tab: 'home',      view: home.render,       requiresUser: true },
-  '/select':    { title: 'メニュー選択',    tab: 'home',      view: select.render,     requiresUser: true },
-  '/confirm':   { title: '今回のプラン',    tab: 'home',      view: confirmView.render, requiresUser: true },
-  '/session':   { title: 'ワークアウト中',  tab: 'home',      view: session.render,    requiresUser: true, teardown: session.teardown },
-  '/dashboard': { title: '月間レポート',    tab: 'dashboard', view: dashboard.render,  requiresUser: true },
-  '/guides':    { title: '種目解説',        tab: 'guides',    view: guide.render,      requiresUser: false },
-  '/settings':  { title: '設定',            tab: 'settings',  view: settings.render,   requiresUser: false }
+  '/login':     { title: 'ログイン',       tab: '',          view: login.render,       requiresUser: false },
+  '/home':      { title: 'LiftLog',        tab: 'home',      view: home.render,        requiresUser: true },
+  '/select':    { title: 'メニュー選択',    tab: 'home',      view: select.render,      requiresUser: true, requiresAuth: true },
+  '/confirm':   { title: '今回のプラン',    tab: 'home',      view: confirmView.render, requiresUser: true, requiresAuth: true },
+  '/session':   { title: 'ワークアウト中',  tab: 'home',      view: session.render,     requiresUser: true, requiresAuth: true, teardown: session.teardown },
+  '/dashboard': { title: '月間レポート',    tab: 'dashboard', view: dashboard.render,   requiresUser: true },
+  '/guides':    { title: '種目解説',        tab: 'guides',    view: guide.render,       requiresUser: false },
+  '/settings':  { title: '設定',            tab: 'settings',  view: settings.render,    requiresUser: false }
 });
 
 /** サーバーから初期データを取得して state に反映する */
@@ -35,7 +38,9 @@ export async function bootstrap() {
   state.settings = data.settings || {};
   state.dashboard = data.dashboard || null;
   state.serverOpenSession = data.openSession || null;
-  setNetState(data.user ? data.user.surname : '接続済み', 'ok');
+  const name = data.user ? (data.user.displayName || data.user.surname) : '接続済み';
+  if (getMode() === 'peek') setNetState('覗き見: ' + name, 'peek');
+  else setNetState(name, 'ok');
   return data;
 }
 
@@ -43,7 +48,9 @@ function setNetState(text, kind) {
   const el = $('#netState');
   el.textContent = text;
   el.className = 'md-chip md-label-medium '
-    + (kind === 'ok' ? 'md-chip--tonal' : kind === 'err' ? 'md-chip--error' : 'md-chip--static');
+    + (kind === 'ok' ? 'md-chip--tonal'
+     : kind === 'peek' ? 'md-chip--peek'
+     : kind === 'err' ? 'md-chip--error' : 'md-chip--static');
 }
 
 async function init() {
@@ -79,7 +86,7 @@ async function init() {
     snackbar(err.message, 'err');
     // 登録が消えている場合はログインからやり直す
     if (err.code === 'UNKNOWN_USER' || err.code === 'NO_USER') {
-      setUser(null);
+      logout();
       navigate('/login');
     } else {
       navigate('/settings');

@@ -1,5 +1,5 @@
 /** router.js — ハッシュベースの簡易ルーター（ログインガード付き） */
-import { getUser } from './state.js';
+import { getUser, canEdit } from './state.js';
 
 const routes = {};
 let previous = null;
@@ -26,6 +26,15 @@ export async function handleRoute() {
       location.replace('#/login');
       return;                       // hashchange で再度この関数が走る
     }
+  }
+
+  // 覗き見モードでは記録系の画面に入れない（サーバー側でも書き込みは拒否される）
+  if (route.requiresAuth && !canEdit()) {
+    if (location.hash !== '#/home') {
+      location.replace('#/home');
+      return;
+    }
+    route = routes['/home'];
   }
 
   if (previous?.teardown) {

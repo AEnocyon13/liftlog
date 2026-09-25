@@ -1,5 +1,5 @@
 /** home.js — ホーム（Extended FAB + 今月サマリ） */
-import { state, loadDraft, getUser } from '../state.js';
+import { state, loadDraft, getUser, canEdit } from '../state.js';
 import { isConfigured } from '../api.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtDateJP, emptyState } from '../ui.js';
 
@@ -29,11 +29,11 @@ export function render(root) {
 
   root.innerHTML = `
     <div class="ll-row ll-row--between" style="margin:4px 4px 12px">
-      <span class="md-title-medium">${esc(getUser() || '')} さんの記録</span>
+      <span class="md-title-medium">${esc(state.user?.displayName || getUser() || '')} さんの記録</span>
       <a class="md-chip md-chip--assist md-state" href="#/settings">${icon('person', 'icon--sm')}切り替え</a>
     </div>
 
-    ${active ? resumeFab(draft) : startFab()}
+    ${canEdit() ? (active ? resumeFab(draft) : startFab()) : peekBanner()}
 
     ${d ? `
       <h2 class="md-section-header">${esc(d.monthLabel)}の進捗</h2>
@@ -95,6 +95,20 @@ const startFab = () => `
     <span>ワークアウト開始
       <span class="md-fab-extended__sub">部位とメニューを選ぶ</span>
     </span>
+  </a>`;
+
+const peekBanner = () => `
+  <div class="ll-peek-banner">
+    <span class="ll-peek-banner__icon">${icon('eye')}</span>
+    <div>
+      <div class="md-title-medium">覗き見モード</div>
+      <p class="md-body-small" style="margin:2px 0 0">
+        記録の閲覧だけができます。ワークアウトの開始・記録・設定の変更はできません。
+      </p>
+    </div>
+  </div>
+  <a class="md-button md-button--outlined md-button--block md-state" href="#/login" style="margin-bottom:12px">
+    ${icon('lock')}PINを入力して本人としてログイン
   </a>`;
 
 const resumeFab = (draft) => `

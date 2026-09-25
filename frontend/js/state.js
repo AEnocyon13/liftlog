@@ -2,10 +2,12 @@
 
 const LS_DRAFT = 'liftlog.draft';
 const LS_USER  = 'liftlog.user';
+const LS_MODE  = 'liftlog.mode';
+const LS_TOKEN = 'liftlog.token';
 const LS_REST  = 'liftlog.restMinutes';
 
 export const state = {
-  user: null,          // { surname, monthlyTargetWorkouts, weightIncrement, restMinutes, ... }
+  user: null,          // { surname, displayName, monthlyTargetWorkouts, weightIncrement, ... }
   menus: [],
   guides: [],
   settings: {},
@@ -15,22 +17,48 @@ export const state = {
   draft: null
 };
 
-/* ---------- ログイン中の苗字 ---------- */
+/* ---------- ログイン中の苗字とモード ---------- */
 
 export function getUser() {
   try { return localStorage.getItem(LS_USER) || null; } catch { return null; }
 }
 
-export function setUser(surname) {
+/** 'auth'（本人・編集可） / 'peek'（覗き見・閲覧のみ） */
+export function getMode() {
+  try { return localStorage.getItem(LS_MODE) === 'peek' ? 'peek' : 'auth'; } catch { return 'auth'; }
+}
+
+/** 書き込み権限を表すトークン。覗き見では null。 */
+export function getToken() {
+  try { return localStorage.getItem(LS_TOKEN) || null; } catch { return null; }
+}
+
+/** 編集できるか。覗き見とトークン切れのときは false。 */
+export function canEdit() {
+  return getMode() === 'auth' && Boolean(getToken());
+}
+
+export function setSession({ surname, mode, token }) {
   try {
-    if (surname) localStorage.setItem(LS_USER, surname);
-    else localStorage.removeItem(LS_USER);
+    if (surname) localStorage.setItem(LS_USER, surname); else localStorage.removeItem(LS_USER);
+    localStorage.setItem(LS_MODE, mode === 'peek' ? 'peek' : 'auth');
+    if (token) localStorage.setItem(LS_TOKEN, token); else localStorage.removeItem(LS_TOKEN);
   } catch { /* プライベートモード等 */ }
+}
+
+/** トークンだけ捨てて覗き見に落とす（有効期限切れのとき） */
+export function demoteToPeek() {
+  setSession({ surname: getUser(), mode: 'peek', token: null });
+  clearDraft();
 }
 
 /** ログアウト。下書きも破棄する（別ユーザーの記録に混ざらないように） */
 export function logout() {
-  setUser(null);
+  try {
+    localStorage.removeItem(LS_USER);
+    localStorage.removeItem(LS_MODE);
+    localStorage.removeItem(LS_TOKEN);
+  } catch { /* noop */ }
   state.user = null;
   state.dashboard = null;
   clearDraft();
