@@ -35,7 +35,18 @@ export function throwIf(error, context) {
   const msg = String(error.message || error);
   const map = [
     [/Invalid login credentials/i, 'PINが違います。'],
-    [/Email not confirmed/i, 'Supabase の Authentication → Sign In / Providers で「Confirm email」をオフにしてください。'],
+    [/Email signups are disabled|email_provider_disabled/i,
+      'Supabase で Email プロバイダーが無効になっています。'
+      + 'Authentication → Sign In / Providers → Email を開き、'
+      + '「Enable Email provider」をオン、「Confirm email」をオフにしてください。'],
+    [/Signups not allowed|signup_disabled/i,
+      'Supabase で新規登録が止められています。Authentication → Sign In / Providers の'
+      + '「Allow new users to sign up」をオンにしてください。'],
+    [/Email not confirmed|email_not_confirmed/i,
+      'Supabase の Authentication → Sign In / Providers → Email で「Confirm email」をオフにしてください。'],
+    [/email_address_invalid|Email address .* is invalid/i,
+      'Supabase がこのアドレス形式を受け付けませんでした。'
+      + 'Authentication → Sign In / Providers → Email の「Confirm email」がオフか確認してください。'],
     [/User already registered/i, 'この登録はすでに使われています。'],
     [/duplicate key value.*display_name/i, 'その名前はすでに登録されています。別の表記にしてください。'],
     [/violates row-level security/i, '覗き見モードでは変更できません。PINを入力してログインしてください。'],

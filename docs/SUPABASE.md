@@ -48,17 +48,36 @@ profiles  user_private  exercises  exercise_guides  workouts  workout_sets
 
 `exercises` を開いて48行、`exercise_guides` に22行あればOKです。
 
-## 3. メール確認をオフにする ★重要
+## 3. Email プロバイダーの設定 ★ここでつまずきやすい
 
 このアプリは「名前を選んで4桁PIN」でログインします。内部では Supabase Auth を
-合成アドレス（`u...@liftlog.app`、実在しません）で使っているため、
-**確認メールが有効のままだと登録できません。**
+合成アドレス（`u...@liftlog.app`、実在しません）で使うため、設定が2つ必要です。
 
-1. 左メニュー **Authentication** → **Sign In / Providers** → **Email**
-2. **Confirm email** を **オフ** にして保存
+左メニュー **Authentication** → **Sign In / Providers** → **Email** を開いて、
 
-同じ画面に **Minimum password length** があります。**6 のまま**にしてください
-（PINは内部で6文字以上の文字列に変換してから渡しています）。
+| 設定 | 状態 |
+|---|---|
+| **Enable Email provider** | **オン** ← カード全体のスイッチ。オフだと `Email signups are disabled` で登録できません |
+| **Confirm email** | **オフ** ← これがオンだと確認メールが要求され、登録しても入れません |
+| Minimum password length | **6 のまま**（PINは内部で6文字以上に変換して渡しています） |
+
+**2つのスイッチは別物です。**「Confirm email をオフに」しようとして、カード全体の
+「Enable Email provider」まで切ってしまうのがよくある間違いです。
+
+### 設定を確かめる
+
+ブラウザで次を開くと、いまの状態が見られます（`APIキー` は anon キー）。
+
+```
+https://＜プロジェクト＞.supabase.co/auth/v1/settings?apikey=＜anonキー＞
+```
+
+- `"email": true` … Email プロバイダーが有効 ✅
+- `"mailer_autoconfirm": true` … Confirm email がオフ ✅
+- `"disable_signup": false` … 新規登録が許可されている ✅
+
+この3つが揃っていれば登録できます。アプリ側も登録に失敗したときは、
+この情報を読んで「どのスイッチが原因か」をそのまま画面に出します。
 
 ## 4. URL と anon キーを控える
 
@@ -144,7 +163,9 @@ Table Editor の各テーブル右上 **⋯ → Export to CSV** で書き出せ�
 | 症状 | 原因と対処 |
 |---|---|
 | 「Supabase の URL と anon キーが設定されていません」 | 手順5が済んでいません |
-| 登録時に「Confirm email をオフに」と出る | 手順3が済んでいません |
+| 「Email プロバイダーが無効になっています」と出る | 手順3の **Enable Email provider** がオフです |
+| 「Confirm email をオフに」と出る | 手順3の **Confirm email** がオンのままです |
+| 「新規登録が止められています」と出る | **Allow new users to sign up** がオフです |
 | `violates row-level security policy` | 覗き見モードのまま書き込もうとしています。PINを入れてログインしてください |
 | ログイン画面に名前が出ない | `profiles` が空です。新規登録から始めてください |
 | 種目が0件 | `seed.sql` を流していません |

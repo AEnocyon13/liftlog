@@ -15,6 +15,7 @@
  * 本物のメールを集めているのは、今後 Google カレンダー連携を足すときに使うため。
  */
 import { sb, throwIf } from './supabase.js';
+import { getSupabaseConfig } from './config.js';
 
 const AUTH_DOMAIN = 'liftlog.app';
 export const PIN_RE = /^\d{4}$/;
@@ -33,6 +34,31 @@ export function normalizePin(raw) {
 }
 
 export const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
+
+/**
+ * 登録につまずいたとき、プロジェクトの認証設定を見て原因を名指しする。
+ * /auth/v1/settings は anon キーで読める公開情報。
+ */
+export async function diagnoseAuthSetup() {
+  try {
+    const { url, anonKey } = getSupabaseConfig();
+    const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } });
+    if (!res.ok) return null;
+    const s = await res.json();
+    if (s.external?.email === false) {
+      return 'Authentication → Sign In / Providers → Email の「Enable Email provider」がオフになっています。';
+    }
+    if (s.disable_signup) {
+      return 'Authentication → Sign In / Providers の「Allow new users to sign up」がオフになっています。';
+    }
+    if (s.mailer_autoconfirm === false) {
+      return 'Authentication → Sign In / Providers → Email の「Confirm email」がオンのままです。オフにしてください。';
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /* ---------- 一覧 ---------- */
 
@@ -60,10 +86,16 @@ export async function register({ displayName, email, pin }) {
 
   const { data: signUp, error: signUpError } =
     await client.auth.signUp({ email: authEmail, password: derivePassword(pin, authEmail) });
-  throwIf(signUpError, '登録');
+  if (signUpError) {
+    // 設定が原因のことが多いので、どのトグルを直せばよいかまで出す
+    const hint = await diagnoseAuthSetup();
+    if (hint) throw new Error('Supabase の設定を直してください。' + hint);
+    throwIf(signUpError, '登録');
+  }
   if (!signUp.session) {
+    const hint = await diagnoseAuthSetup();
     throw new Error('登録はできましたが、サインインできませんでした。'
-      + 'Supabase の Authentication → Sign In / Providers で「Confirm email」をオフにしてください。');
+      + (hint || 'Supabase の Authentication → Sign In / Providers → Email で「Confirm email」をオフにしてください。'));
   }
 
   const id = signUp.user.id;
