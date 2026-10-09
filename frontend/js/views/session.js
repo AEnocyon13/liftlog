@@ -1,6 +1,7 @@
 /** session.js — ワークアウト実行中の記録画面（経過時間 + 休憩タイマー + セット記録） */
 import { state, saveDraft, clearDraft } from '../state.js';
-import { api } from '../api.js';
+import * as db from '../db.js';
+import { startAutosave, stopAutosave, touch, flushNow, autosaveState } from '../autosave.js';
 import { esc, icon, snackbar, confirmDialog, fmtNum, fmtDuration, fmtVolume, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
 import { navigate } from '../router.js';
@@ -22,19 +23,52 @@ export function render(root) {
   root.addEventListener('input', onInput);
   startElapsed();
   startTicking(() => paintAndRebind(root));
+
+  // 10分ごと・入力の数秒後・画面を離れるときに Supabase へ自動保存する
+  if (state.workout) {
+    startAutosave({
+      workoutId: state.workout.id,
+      getDraft: () => state.draft,
+      onState: paintAutosave
+    });
+  }
 }
 
 export function teardown() {
   if (elapsedId) { clearInterval(elapsedId); elapsedId = null; }
   stopTicking();
+  stopAutosave();
+}
+
+/** 自動保存の状態表示だけを差し替える（全体を再描画しない） */
+function paintAutosave() {
+  const el = document.querySelector('#autosave');
+  if (el) el.outerHTML = autosaveHtml();
+}
+
+function autosaveHtml() {
+  const { saving, dirty, lastSavedAt, lastError } = autosaveState();
+  const label = lastError ? '保存できていません'
+    : saving ? '保存中…'
+    : lastSavedAt ? `${lastSavedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} に自動保存`
+    : dirty ? '未保存の入力があります'
+    : '自動保存は有効です';
+  const tone = lastError ? 'md-chip--error' : 'md-chip--static';
+  return `<span class="md-chip ${tone} md-label-medium" id="autosave" title="10分ごと・入力の数秒後・画面を離れるときに保存します">
+    ${icon(lastError ? 'error' : 'check', 'icon--sm')}${esc(label)}
+  </span>`;
 }
 
 function startElapsed() {
   if (elapsedId) clearInterval(elapsedId);
+  const startedAt = (() => {
+    const t = new Date(state.draft?.startTime ?? state.workout?.started_at ?? Date.now()).getTime();
+    return Number.isFinite(t) ? t : Date.now();
+  })();
   const tick = () => {
     const el = document.querySelector('#elapsed');
     if (!el) { clearInterval(elapsedId); elapsedId = null; return; }
-    el.textContent = fmtDuration(Date.now() - new Date(state.draft.startTime).getTime());
+    el.textContent = fmtDuration(Date.now() - startedAt);
   };
   tick();
   elapsedId = setInterval(tick, 1000);
@@ -57,6 +91,7 @@ function paint(root) {
           <div class="md-body-small on-surface-variant" id="totSets">${totals.sets} セット完了</div>
         </div>
       </div>
+      <div style="margin-top:12px">${autosaveHtml()}</div>
     </div>
 
     ${restTimerHtml()}
@@ -162,6 +197,7 @@ function onInput(ev) {
   if (el.dataset.act === 'memo') {
     state.draft.memo = el.value;
     saveDraft();
+    touch();
     return;
   }
   if (!el.dataset.f) return;
@@ -169,6 +205,7 @@ function onInput(ev) {
   if (!set) return;
   set[el.dataset.f] = el.value === '' ? '' : Number(el.value);
   saveDraft();
+  touch();
   const totals = calcTotals(state.draft);
   const volEl = ev.currentTarget.querySelector('#totVolume');
   const setEl = ev.currentTarget.querySelector('#totSets');
@@ -207,6 +244,7 @@ function onClick(ev) {
     return;
   }
   saveDraft();
+  touch();
   paintAndRebind(root);
 }
 
@@ -234,25 +272,23 @@ async function finish(root) {
   }
   const ok = await confirmDialog({
     headline: 'ワークアウトを終了しますか？',
-    body: '入力済みのセットをスプレッドシートに記録します。',
+    body: '入力済みのセットを記録として保存します。',
     confirmLabel: '記録する'
   });
   if (!ok) return;
+  await flushNow();
 
   try {
-    const res = await api.finishSession({
-      sessionId: draft.sessionId,
-      startTime: draft.startTime,
-      endTime: new Date().toISOString(),
-      date: draft.date,
+    const res = await db.finishWorkout(state.workout, entries, {
       memo: draft.memo || '',
       restMinutes: draft.rest?.minutes,
-      entries
+      startedAt: draft.startTime
     });
-    state.dashboard = res.dashboard || state.dashboard;
     teardown();
     clearDraft();
     resetPicking();
+    state.workout = null;
+    state.dashboard = await db.dashboard(state.profile.id);
     snackbar(`${res.savedSets}セット / ${fmtVolume(res.totalVolume)} を記録しました`, 'ok');
     navigate('/dashboard');
   } catch (err) {
@@ -268,11 +304,12 @@ async function abort() {
     danger: true
   });
   if (!ok) return;
-  const id = state.draft?.sessionId;
+  const workout = state.workout;
   teardown();
   clearDraft();
   resetPicking();
-  if (id) { try { await api.deleteSession(id); } catch { /* 行が無ければ無視 */ } }
+  state.workout = null;
+  if (workout) { try { await db.deleteWorkout(workout.id); } catch { /* 既に無ければ無視 */ } }
   snackbar('ワークアウトを中止しました');
   navigate('/home');
 }

@@ -1,0 +1,670 @@
+-- =====================================================================
+-- LiftLog — 種目マスターと解説の初期データ
+--
+-- Notion「筋トre」の 種目｜Exercises データベースから取り込んだ48種目。
+-- 原文のスナップショット: docs/notion-guide-source.md
+--
+-- schema.sql のあとに SQL Editor で実行する。
+-- 何度実行しても重複しない（同じ 部位×種目名 は上書き）。
+-- 手で編集した解説も上書きされるので、入れ直すとき以外は再実行しないこと。
+-- =====================================================================
+
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'ケーブルクロスオーバー', 'ケーブル', 8, 12, 3, 1, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'フラットダンベルプレス', 'ダンベル', 8, 12, 3, 2, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'デクラインベンチプレス', 'バーベル', 8, 12, 3, 3, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ デクラインベンチプレスのフォームのポイント
+・胸を張る
+　→ 胸をしっかり張って、肩甲骨を軽く寄せる（背中でベンチを押しつぶすイメージ）。
+・足で踏ん張る
+　→ デクライン角度だと足が引っ掛かるようになっているので、しっかり固定して体を安定させる。
+・バーはみぞおち〜胸下に下ろす
+　→ 通常のベンチより少し低めに下ろす意識。胸下をめがけると大胸筋下部にヒットしやすい。
+・肘をやや斜めに下ろす
+　→ 真横に開きすぎず、少し体側に近いライン（45度くらい）で肘を下ろすと肩の負担が減る。
+・下ろすときはゆっくり、押し出すときは爆発的に
+　→ ネガティブ（下ろす動作）を丁寧に行うと効きが倍増します！', array['大胸筋']::text[], array['上腕三頭筋', '三角筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '胸' and name = 'デクラインベンチプレス'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'インクラインダンベルフライ', 'ダンベル', 8, 12, 3, 4, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ フライとプレスの違い
+■ フォームのポイント
+・ベンチ角度は30〜45度が理想（プレスと同じ）。
+・肘は軽く曲げて固定 → ロックせず柔らかく使う。
+・ダンベルを「弧を描くように」動かし、大胸筋のストレッチを感じながら丁寧に動作。
+・負荷が抜けやすいので、上でダンベルをぶつけないこと！
+■ 注意点
+・肩関節に負担がかかりやすい種目なので、無理な可動域・重量はNG。
+・「胸の筋肉で抱きしめるように閉じる」イメージが大事です。', array['大胸筋']::text[], array['三角筋', '上腕二頭筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '胸' and name = 'インクラインダンベルフライ'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'インクラインダンベルプレス', 'ダンベル', 8, 12, 3, 5, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ ベンチ角度のポイント
+・30～45度くらいが理想的とされます。
+　・角度が高すぎる（60度以上）と、肩（三角筋前部）への刺激が強くなりすぎて胸から負荷が逃げやすくなります。
+■ 補足
+・胸の上部が弱い人や、大胸筋全体の厚みを出したい人に特におすすめ。
+・ダンベルを使うことで、左右差の修正やより深い可動域での刺激が得られます。', array['大胸筋']::text[], array['三角筋', '上腕三頭筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '胸' and name = 'インクラインダンベルプレス'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'ディップス', '自重', 8, 12, 3, 6, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ フォームでターゲットが変わる', array['大胸筋', '上腕三頭筋']::text[], array['三角筋', '前鋸筋', '僧帽筋', '広背筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '胸' and name = 'ディップス'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('胸', 'ベンチプレス', 'バーベル', 8, 12, 3, 7, 1, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・マックスを測る際等、ワンレップの際はラックアップする前に一度息を吸って、その後は基本的に吸わない。
+　・手は、逆八の字にして、親指の付け根から手首の間ぐらいにバーベルが乗るようにする。
+■ 上腕二頭筋には効かない？
+■ ベンチプレスのフォーム（基本）
+■ 🧱 セットアップ（寝る前に行う準備）
+・目の真下にバーが来るように寝る
+・肩甲骨を寄せて下げ、胸を張った状態を作る（ブリッジ）
+・足はしっかり地面につけて、下半身でも踏ん張れる姿勢
+■ 💪 グリップとバーの握り方
+・手幅：バーのリング〜小指 or 薬指が乗るあたり（肩幅よりやや広め）
+・親指は握る（サムアラウンドグリップ）が安全
+・リストは寝かさず、前腕と一直線になるように（手首を痛めない）
+■ ⬇️ 動作（下ろし）
+・バストトップ（乳首あたり）を目指して下ろす
+・肘はやや体側に寄せる（45〜60度）
+・胸の張りをキープして、肩が上がらないように注意
+■ ⬆️ 動作（上げる）
+・足で踏ん張り、体幹で全体を安定させたまま押し上げる
+・バーは真上ではなく、わずかに斜め後方へ軌道を描く
+・最後までロックアウト（肘を伸ばす）', array['大胸筋']::text[], array['三角筋', '上腕三頭筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "世界王者パワーリフターの指導(畑かいと)", "url": "https://youtu.be/4lsbUtEgBKg?si=0UDrjhlNLvB8OnDO", "videoId": "4lsbUtEgBKg"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '胸' and name = 'ベンチプレス'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ダイバージングローロウ', 'マシン', 8, 12, 3, 1, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'バントオーバーロー', 'バーベル', 8, 12, 3, 2, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ナローマグ', 'マシン', 8, 12, 3, 3, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'マググリップ広いやつ', 'マシン', 8, 12, 3, 4, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ケーブルプルダウン', 'ケーブル', 8, 12, 3, 5, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'プルダウン　ナロー', 'マシン', 8, 12, 3, 6, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'アイソラテラルワイドプルダウン', 'マシン', 8, 12, 3, 7, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ケーブルプル', 'ケーブル', 8, 12, 3, 8, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ケーブルプルオーバー', 'ケーブル', 8, 12, 3, 9, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'シーテッドケーブルプル', 'ケーブル', 8, 12, 3, 10, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '20回　反動つけて、ネガティブに聞かせる
+胸を突き出して引ききる　後継し過ぎない　やや反動つかる
+引ききる　ストレッチ
+　ポイント
+　・肘をしっかり引いて肩甲骨を寄せる意識をすると、背中への効きが良くなります。
+　・チーティング（反動）を使いすぎると腕や腰に負荷が逃げてしまうので、丁寧なフォームが大切です。', array['広背筋', '大円筋', '僧帽筋', '菱形筋']::text[], array['上腕二頭筋', '腕橈骨筋', '三角筋', '脊柱起立筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデとカネキンの合トレ動画 7:00~", "url": "https://youtu.be/ZFQ1NYuSGtk?si=cw2nbVODCaHj3E5v", "videoId": "ZFQ1NYuSGtk"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = 'シーテッドケーブルプル'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'アイソラテラルDYロー 片手ずつ', 'マシン', 8, 12, 3, 11, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・勢いをある程度つけて行うのもok
+　・ビックヒデは立って行っているが、多摩境Anytimeは座る所がついているので座らざるをえない
+■ 片手ずつ行うメリット
+■ 💡ポイント
+・肘を後ろに「引く」意識を強く持つと、腕ではなく背中にしっかり効かせやすくなります。
+・腕で引かないように注意！バーやハンドルは「握るだけ」でもOK。
+・ネガティブ（戻す動作）も丁寧に行うと効果倍増！
+■ 📌まとめ
+“「片手ずつのアイソラテラルDYロー」は、広背筋の厚みと左右のバランスを整えるのに最適な種目です。フリーウェイトに近い感覚で鍛えられるのに、マシンの安定感もあるという、まさに“いいとこ取り”。”', array['広背筋']::text[], array['大円筋', '僧帽筋', '菱形筋', '三角筋', '上腕二頭筋', '腕橈骨筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "カネキンとビックヒデの合トレ動画(背中) 13:00~", "url": "https://youtu.be/ZFQ1NYuSGtk?si=bI3DC-v5oR_Kmq2r", "videoId": "ZFQ1NYuSGtk"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = 'アイソラテラルDYロー 片手ずつ'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'ラットプルダウン', 'マシン', 8, 12, 3, 12, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・ビハインドとフロントのどちらもやる
+　・胸で抑えに行く
+　フロントとビハインドネックの違い
+　　・両方行う場合、筋肉への刺激のバリエーションをつけられるのはメリットですが、肩関節や頸椎へのリスクを考えると、ビハインドネックは注意が必要です。
+　　・フロントをメインにしつつ、肩が柔らかく可動域が十分あるなら、時折ビハインドを組み込むのがベター。', array['広背筋']::text[], array['大円筋', '僧帽筋', '菱形筋', '上腕二頭筋', '腕橈骨筋', '上腕筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデ 地獄の背中トレ 0:50~", "url": "https://youtu.be/aiPd1TI8l0M?si=WOj6k2z3GpsBVXNi", "videoId": "aiPd1TI8l0M"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = 'ラットプルダウン'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'フロントラットプルダウン', 'マシン', 8, 12, 3, 13, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・最初に行っていた種目
+　・アップで20回、ガチの3セットを行った後に、3段階のドロップセット
+　特徴
+　・「フロント」ラットプルダウンはバーを胸の前に引くフォームで、肩への負担が少なく、より安全とされています（バーを首の後ろに引く“ビハインドネック”と比較して）。
+　・フォームが適切であれば、広背筋への効きが高まります。', array['広背筋']::text[], array['僧帽筋', '菱形筋', '上腕二頭筋', '腕橈骨筋', '大円筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "カネキンとビックヒデの合トレ(背中) 1:40~", "url": "https://youtu.be/ZFQ1NYuSGtk?si=a152sVy740wAixxR", "videoId": "ZFQ1NYuSGtk"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = 'フロントラットプルダウン'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', '懸垂', '自重', 8, 12, 3, 14, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, null, array['広背筋']::text[], array['上腕二頭筋', '三角筋', '僧帽筋', '前腕筋群']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = '懸垂'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('背中', 'デッドリフト', 'バーベル', 5, 8, 3, 15, 2, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, null, array['大臀筋', '脊柱起立筋']::text[], array['大腿四頭筋', 'ハムストリングス', '下腿三頭筋', '僧帽筋', '広背筋', '腹直筋', '腹斜筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '背中' and name = 'デッドリフト'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'ジャンプスクワット', '自重', 8, 12, 3, 1, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'レッグプレス', 'マシン', 8, 12, 3, 2, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'レッグカール', 'マシン', 8, 12, 3, 3, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'レッグエクステンション', 'マシン', 8, 12, 3, 4, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'フルスクワット', 'バーベル', 5, 8, 3, 5, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('脚', 'スクワット', 'バーベル', 8, 12, 3, 6, 3, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, null, array['大腿四頭筋', '大臀筋']::text[], array['下腿三頭筋', 'ハムストリングス', '脊柱起立筋', '僧帽筋', '上腕二頭筋', '前腕筋群', '三角筋', '腹直筋', '腹斜筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '脚' and name = 'スクワット'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('肩', 'ケーブルショルダープレス', 'ケーブル', 8, 12, 3, 1, 4, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('肩', 'ケーブルサイドレイズ', 'ケーブル', 8, 12, 3, 2, 4, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('肩', 'ショルダープレス', 'ダンベル', 8, 12, 3, 3, 4, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('肩', 'サイドレイズ', 'ダンベル', 12, 15, 3, 4, 4, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, null, array['三角筋']::text[], array['僧帽筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '肩' and name = 'サイドレイズ'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'ケーブルカール', 'ケーブル', 8, 12, 3, 1, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'リストカール', 'バーベル', 12, 15, 3, 2, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'リストカール等3種目', 'バーベル', 12, 15, 3, 3, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'トライセップスプレス', 'マシン', 8, 12, 3, 4, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'スピネイト', 'バーベル', 12, 15, 3, 5, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ 立った状態・肘を伸ばして行うスタイルの場合
+・「肘を伸ばしたままスピネーションを行う」のはやや特殊ですが、
+　その動作が意識的に回外動作にフォーカスされているなら、
+　上腕二頭筋の長頭（外側）に特に刺激が入りやすいです。
+・ただし、肘が完全に伸びたままでは負荷が逃げやすいため、
+　軽く肘を曲げ、肘を固定した状態で行うとより効果的です。
+■ 🔑 効かせるコツ
+・軽めの重量で、丁寧にスピネーションを感じながら上げる。
+・肘を体の横でしっかり固定（振らない）。
+・上げ切ったときに「手のひらが自分の肩を向く」くらい回す。
+・ネガティブ（下ろす動作）もコントロールしてじっくり効かせる。', array['上腕二頭筋']::text[], array['腕橈骨筋', '上腕筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'スピネイト'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'アームカール', 'バーベル', 8, 12, 3, 6, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・EZバーを用いて行っている
+・グリップ（手のひらの向き）によって使われる筋肉の比率が変わります：
+　・順手（プロネーション）：腕橈骨筋の関与が増える（例：リバースカール）
+　・逆手（スピネーション）：上腕二頭筋がより強く働く（例：通常のバーベルカール）
+　・ハンマーグリップ：上腕筋と腕橈骨筋の両方に刺激が入りやすい（例：ハンマーカール）', array['上腕二頭筋']::text[], array['腕橈骨筋', '上腕筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'アームカール'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'ケーブルリバースカール', 'ケーブル', 8, 12, 3, 7, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・手首を返して座ってストレッチをすると良い
+　■ 特徴とポイント
+　・オーバーハンドグリップ（手の甲が上）のため、上腕二頭筋が主役になりにくい
+　・普通のカールよりも前腕のパンプ感が大きい
+　・ケーブルを使うことで、動作中ずっと負荷が抜けにくい
+■ 🏋️‍♂️ フォームのポイント
+・手首を反らさず固定（過剰に動かすと手首痛めます）
+・肘は体の横で固定して動かさない
+・反動を使わないよう、ゆっくり下ろす', array['腕橈骨筋']::text[], array['上腕筋', '上腕二頭筋', '手指屈筋群']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデとカネキンの合トレ動画(腕) 15:15~", "url": "https://youtu.be/wbn2-WAjl5Y?si=noJc-HXu0WYQGOfw", "videoId": "wbn2-WAjl5Y"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'ケーブルリバースカール'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'バーベルリバースカール', 'バーベル', 8, 12, 3, 8, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・ストレートバー
+　・座って
+　・肘は入れてワイド目に
+　・三角筋にはわずかに負荷がかかる
+　・ビッグヒデは椅子にバーベルを完全においてから持ち上げていた。(デッドストップ)
+　特徴
+　・手のひらを下に向けて（オーバーハンド）握ることで、前腕〜肘あたりの筋肉（特に腕橈骨筋）に強烈な刺激。
+　・上腕二頭筋より「前腕の太さ」「肘周りの盛り上がり」を出したい人にオススメ！', array['腕橈骨筋', '上腕筋']::text[], array['上腕二頭筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデとカネキンの合トレ動画(腕) 14:25~", "url": "https://youtu.be/wbn2-WAjl5Y?si=noJc-HXu0WYQGOfw", "videoId": "wbn2-WAjl5Y"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'バーベルリバースカール'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'スカルクラッシャー', 'バーベル', 8, 12, 3, 9, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・EZバーで頭の上のベンチに下ろしてデッドストップ
+　・挙がんなくなってきたらプルオーバープレス→つぶれてから追い込むのあり
+俺は一緒にナローベンチも9回やっている
+　・三角筋にはわずかに負荷がかかる
+　・ビッグヒデは椅子にバーベルを完全においてから持ち上げていた。(デッドストップ)
+　特徴
+　・肘を固定し、頭上からバーを下ろすことで三頭筋の長頭をストレッチ〜収縮させる。
+　・上腕三頭筋のボリュームアップに最適。
+　・肘関節の負担が大きいため、フォームと重量には注意。
+■ デッドストップとは
+「動作のボトム（最下点）で一瞬止めること」を指します。
+つまり、反動を一切使わずに“静止状態”から力を入れて持ち上げるというテクニック。
+■ 特徴
+・筋肉が伸びた状態から収縮する力を鍛える
+・チーティング（反動）を防ぐ
+・可動域の一番キツい部分で“筋出力”を高める
+・筋力発揮の“初動”が強化される
+■ 🏋️‍♂️ スカルクラッシャー × デッドストップ
+■ 通常のスカルクラッシャー
+・肘を固定したままバー（またはEZバー）を額〜頭の上にゆっくり下ろし、すぐに反転して戻す
+■ デッドストップを入れると
+・バーをゆっくりと下ろす（肘の角度が大きく開く位置まで）
+・頭上の低い位置で一瞬止める（1秒前後）
+・そこから反動を使わずに三頭筋で押し上げる
+■ 目的
+・上腕三頭筋長頭のストレッチを最大化
+・「重いけど勢いでいける」ではなく「純粋な筋力で持ち上げる」動きになる
+・筋肥大よりも筋力強化・フォーム安定・可動域の強化に特化
+■ 💡 こんな人におすすめ！
+・三頭筋の効きが甘い人
+・フォームが安定せずチーティングが入ってしまう人
+・筋力アップを狙っていて、弱点の初動を改善したい人
+■ 🧠 補足：デッドストップは他にも使える
+・デッドリフト（床で完全に止めてから持ち上げる）
+・スクワット（下で静止 → 反動を使わずに上がる）
+・ベンチプレス（胸で一瞬止めてからプレス）
+　などなど、「静止 → 持ち上げ」の動作を取り入れたい場面で大活躍します。', array['上腕三頭筋']::text[], array['前腕筋群', '三角筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデとカネキンの合トレ動画(腕) 11:10~", "url": "https://youtu.be/wbn2-WAjl5Y?si=noJc-HXu0WYQGOfw", "videoId": "wbn2-WAjl5Y"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'スカルクラッシャー'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'インクラインダンベルカール', 'ダンベル', 8, 12, 3, 10, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・下を持って外に回転させる事
+　特徴
+　・ベンチに座って背もたれに体を預けることで、腕が体の後ろに位置 → 二頭筋が最大限にストレッチされる。
+　・「二頭のピーク（高さ）」を出したい人には超オススメ。
+　・反動を使いにくいので、筋肉への集中度が高い。', array['上腕二頭筋']::text[], array['上腕筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "ビックヒデとカネキンの合トレ動画(腕) 7:40~", "url": "https://youtu.be/wbn2-WAjl5Y?si=noJc-HXu0WYQGOfw", "videoId": "wbn2-WAjl5Y"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'インクラインダンベルカール'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'ケーブルプレスダウン', 'ケーブル', 8, 12, 3, 11, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '■ ビックヒデとカネキンの合トレ動画(腕)　5:13~
+　・31.25kgからドロップで行っていた
+　・なるべく起立しており、背中は曲げていなかった
+　特徴
+　・ケーブルマシンの定番三頭筋種目。
+　・ロープで行うと可動域が広がって外側頭の収縮が強調される。
+　・フォームを丁寧にやれば、三頭筋の「カット」「張り出し」を作るのに最高。', array['上腕三頭筋']::text[], array['三角筋', '前腕筋群']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'ケーブルプレスダウン'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腕', 'バーベルカール', 'バーベル', 8, 12, 3, 12, 5, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, '・ストレートバー
+　・立って　3セットやった後にドロップセット
+　・ストレッチもすること→上腕筋の使い目を伸ばす事
+　・ストレートバーで行うと、回外して効きやすいので良い
+　・立って多少勢いをつけてでも行うと良い。ネガ意識
+　・ストレッチも行う事。上腕筋の使い目(前腕寄り)の部分を伸ばす事。
+　特徴
+　・二頭筋のベーシック種目。扱える重量が比較的重く、筋肥大に向いている。
+　・グリップ幅を広くすると短頭（内側）、狭くすると長頭（外側）に刺激が変わる。
+　・反動に頼りすぎないフォームが大事！', array['上腕二頭筋']::text[], array['上腕筋', '腕橈骨筋']::text[],
+       '{}'::text[], '{}'::text[], '[{"title": "カネキンとビックヒデの合トレ(腕)動画 0:50~", "url": "https://youtu.be/wbn2-WAjl5Y?si=WZjp-1qr6bhYKcxw", "videoId": "wbn2-WAjl5Y"}]'::jsonb, '{}'::text[]
+from public.exercises where part = '腕' and name = 'バーベルカール'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腹', 'トーソーローテーション', 'マシン', 12, 15, 3, 1, 6, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腹', 'トルソーマシンツイスト', 'マシン', 12, 15, 3, 2, 6, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腹', 'アブドミナル', 'マシン', 12, 15, 3, 3, 6, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+
+insert into public.exercises (part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, active)
+values ('腹', 'アブローラー', '自重', 12, 15, 3, 4, 6, true)
+on conflict (part, name) do update set
+  equipment = excluded.equipment, rep_min = excluded.rep_min, rep_max = excluded.rep_max,
+  default_sets = excluded.default_sets, sort_order = excluded.sort_order,
+  part_order = excluded.part_order, active = true;
+insert into public.exercise_guides (exercise_id, description, muscles, assist_muscles, points, cautions, videos, tags)
+select id, null, array['腹直筋', '腹斜筋']::text[], array['広背筋', '大胸筋', '三角筋', '上腕三頭筋', '脊柱起立筋']::text[],
+       '{}'::text[], '{}'::text[], '[]'::jsonb, '{}'::text[]
+from public.exercises where part = '腹' and name = 'アブローラー'
+on conflict (exercise_id) do update set
+  description = excluded.description, muscles = excluded.muscles, assist_muscles = excluded.assist_muscles,
+  points = excluded.points, cautions = excluded.cautions, videos = excluded.videos,
+  tags = excluded.tags, updated_at = now();

@@ -1,8 +1,8 @@
 <!--
   Notion「筋トre」の 種目｜Exercises データベースから取り込んだ種目マスターの原文。
   ここは取り込み結果のスナップショットであり、アプリが直接読むものではない。
-  Setup.gs の seedGuideDoc() / rewriteGuideDoc() がこの内容を Google ドキュメントへ書き込み、
-  以降の編集は Google ドキュメント側で行う（docs/DOC_FORMAT.md 参照）。
+  supabase/seed.sql がこの内容を exercise_guides テーブルへ投入する。
+  以降の編集は Supabase の Table Editor で行う（docs/SUPABASE.md 参照）。
 
   取得方法: queryCollection で全49行を列挙し、各ページを loadPageChunk +
   syncRecordValues で再帰取得（折りたたまれたトグルの中身も含む）。

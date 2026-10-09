@@ -1,6 +1,6 @@
 /** dashboard.js — 月間レポート */
 import { state } from '../state.js';
-import { api } from '../api.js';
+import * as db from '../db.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP, snackbar, emptyState } from '../ui.js';
 
 let viewMonth = null;
@@ -14,7 +14,7 @@ export async function render(root) {
     root.innerHTML = `<div class="md-card md-card--filled">
       <p class="md-body-medium on-surface-variant" style="margin:0">集計中…</p></div>`;
     try {
-      d = await api.dashboard(viewMonth);
+      d = await db.dashboard(state.profile.id, viewMonth);
       if (d.month === state.dashboard?.month || !state.dashboard) state.dashboard = d;
     } catch (err) {
       root.innerHTML = `<div class="md-card md-card--filled">
@@ -155,7 +155,7 @@ function paint(root, d) {
     }
     if (ev.target.closest('#reloadDash')) {
       try {
-        const fresh = await api.dashboard(viewMonth);
+        const fresh = await db.dashboard(state.profile.id, viewMonth);
         state.dashboard = fresh;
         paint(root, fresh);
         snackbar('再集計しました', 'ok');

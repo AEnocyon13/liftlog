@@ -1,6 +1,6 @@
 /** home.js — ホーム（Extended FAB + 今月サマリ） */
-import { state, loadDraft, getUser, canEdit } from '../state.js';
-import { isConfigured } from '../api.js';
+import { state, loadDraft, canEdit } from '../state.js';
+import { isConfigured } from '../config.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtDateJP, emptyState } from '../ui.js';
 
 export function render(root) {
@@ -14,7 +14,7 @@ export function render(root) {
           </div>
         </div>
         <p class="md-body-medium on-surface-variant" style="margin-top:0">
-          入力した内容はこの端末のブラウザにのみ保存されます。
+          手順は docs/SUPABASE.md にまとめてあります。
         </p>
         <a class="md-button md-button--filled md-button--block md-state" href="#/settings">
           ${icon('settings')}設定を開く
@@ -29,7 +29,7 @@ export function render(root) {
 
   root.innerHTML = `
     <div class="ll-row ll-row--between" style="margin:4px 4px 12px">
-      <span class="md-title-medium">${esc(state.user?.displayName || getUser() || '')} さんの記録</span>
+      <span class="md-title-medium">${esc(state.profile?.display_name || '')} さんの記録</span>
       <a class="md-chip md-chip--assist md-state" href="#/settings">${icon('person', 'icon--sm')}切り替え</a>
     </div>
 
@@ -60,7 +60,7 @@ export function render(root) {
       <div class="ll-stat-grid">
         ${stat(fmtVolume(d.totals.volume), '総ボリューム')}
         ${stat(d.totals.sets, '総セット')}
-        ${stat(d.restDays === null ? '—' : d.restDays, '最終から', '日')}
+        ${d.restDays === null ? stat('—', '最終から') : stat(d.restDays, '最終から', '日')}
       </div>
 
       ${d.prs && d.prs.length ? `

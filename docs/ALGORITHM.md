@@ -1,6 +1,6 @@
 # 重量提案アルゴリズム仕様
 
-実装: [`backend/Progression.gs`](../backend/Progression.gs) の `suggestNextLoad_()`
+実装: [`frontend/js/progression.js`](../frontend/js/progression.js) の `suggestNextLoad()`
 
 方式は **前回実績のキャリーオーバー + 固定増量**。
 
@@ -13,10 +13,10 @@
 
 | 記号 | 取得元 | 説明 |
 |---|---|---|
-| `history` | `Logs_<姓>` シート | 同一 部位×種目 の直近6セッション（新しい順、セッション単位に集約済み） |
-| `increment` | Users シートの `weightIncrement` | 前回比で足す重量(kg)。既定 2.5、ユーザーごとに変更可 |
-| `repMin` / `repMax` | Menus シート | 履歴が無い種目で表示する目標レップ範囲 |
-| `defaultSets` | Menus シート | 履歴が無い種目の初期セット数 |
+| `history` | `workout_sets` テーブル | 同一 部位×種目 の直近6セッション（新しい順、セッション単位に集約済み） |
+| `increment` | `profiles.weight_increment` | 前回比で足す重量(kg)。既定 2.5、ユーザーごとに変更可 |
+| `repMin` / `repMax` | `exercises` テーブル | 履歴が無い種目で表示する目標レップ範囲 |
+| `defaultSets` | `exercises` テーブル | 履歴が無い種目の初期セット数 |
 | `manualWeight` / `manualDelta` | ユーザー操作 | 手動上書き |
 
 ## 処理
@@ -86,8 +86,8 @@ last = history[0]（前回セッション）
 
 ## 動作確認
 
-GASエディタで `testProgression()` を実行すると、シート無しで4ケースを確認できる。
-実行結果（increment = 2.5kg）:
+`node --input-type=module` などで `suggestNextLoad` を直接呼べば、通信なしで確認できる
+（副作用の無い純粋な関数にしてある）。確認済みの4ケース（increment = 2.5kg）:
 
 | ケース | 結果 |
 |---|---|
@@ -100,4 +100,4 @@ GASエディタで `testProgression()` を実行すると、シート無しで4�
 
 v1 ではダブルプログレッション（レップが上限に達したら増量）+ RPE 補正 + ディロード判定を実装していたが、
 「前回のセット数・レップのまま重量だけ上げる」という運用に合わせて v2 で置き換えた。
-RPE は引き続きセット単位で記録でき、`Logs_<姓>` シートに残るが、提案の計算には使っていない。
+RPE は引き続きセット単位で記録でき、`workout_sets.rpe` に残るが、提案の計算には使っていない。

@@ -8,7 +8,7 @@ export function showGuide(part, menu) {
     openSheet(`
       <h2 class="md-dialog__headline" id="sheetTitle">${esc(menu)}</h2>
       <p class="md-body-medium on-surface-variant">${esc(part)}</p>
-      ${emptyState('book', 'この種目の解説がドキュメントにまだありません。Googleドキュメントに「見出し2 = 種目名」で追加してください。')}
+      ${emptyState('book', 'この種目の解説はまだ登録されていません。Supabase の exercise_guides テーブルに追加できます。')}
     `);
     return;
   }
@@ -75,10 +75,13 @@ function summaryOf(g) {
 
 /** 種目解説の一覧画面 */
 export function render(root) {
-  const guides = state.guides || [];
+  const guides = (state.exercises || []).map((e) => e.guide || {
+    part: e.part, menu: e.menu, key: `${e.part}::${e.menu}`,
+    description: '', muscles: [], assistMuscles: [], points: [], cautions: [], videos: [], tags: []
+  });
   if (!guides.length) {
     root.innerHTML = emptyState('book',
-      '解説データがありません。Googleドキュメントに種目を追加し、設定画面から「解説を再読込」してください。',
+      '種目データがありません。Supabase の SQL Editor で supabase/seed.sql を実行してください。',
       '<a class="md-button md-button--filled md-state" href="#/settings">設定を開く</a>');
     return;
   }

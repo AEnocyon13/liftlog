@@ -1,28 +1,41 @@
 /**
- * login.js — 苗字 → PIN / 覗き見 / 新規登録
+ * login.js — 名前を選んでログイン / 覗き見 / 新規登録
  *
- * 画面は4段階。
- *   surname  … 苗字を入れる（登録済みなら候補チップから選べる）
- *   pin      … 本人としてログイン（PIN入力）か、覗き見（閲覧のみ）かを選ぶ
- *   register … 未登録の苗字。氏名と4桁PINを決めて登録する
- *   setPin   … 登録済みだがPIN未設定の人。氏名とPINを決める
+ *   list     … 登録者の名前を並べる。はじめての人は「新規登録」
+ *   pin      … PINを入れて本人としてログイン、または覗き見（PIN不要）
+ *   register … 氏名 + メールアドレス + 4桁PIN
+ *
+ * メールアドレスは、今後の Google カレンダー連携のために登録時に預かる。
+ * 本人しか読めない場所（user_private）に入るので、名前の一覧には出ない。
  */
-import { state, setSession, SURNAME_RE, normalizeSurname, clearDraft } from '../state.js';
-import { api, isConfigured } from '../api.js';
-import { esc, icon, snackbar, confirmDialog } from '../ui.js';
+import { state, setPeekTarget, clearDraft } from '../state.js';
+import { isConfigured } from '../config.js';
+import * as auth from '../auth.js';
+import * as db from '../db.js';
+import { esc, icon, snackbar } from '../ui.js';
 import { navigate } from '../router.js';
-import { bootstrap } from '../app.js';
+import { bootstrap, paintNetState } from '../app.js';
 
-let knownUsers = [];
-let step = 'surname';
-let ctx = { surname: '', displayName: '' };
+let step = 'list';
+let profiles = [];
+let picked = null;
+let loading = false;
+
+/**
+ * いま画面に出ている #view を返す。
+ * ルーターは画面遷移のたびに #view ごと差し替えるため、await のあとに
+ * 最初の root へ描き込むと、切り離された要素に書いて画面が固まる。
+ */
+const liveRoot = () => document.querySelector('#view');
 
 export async function render(root) {
   if (!isConfigured()) {
     root.innerHTML = `
       <div class="md-card md-card--filled">
-        <div class="md-card__title">先に接続設定が必要です</div>
-        <p class="md-body-medium on-surface-variant">GASのWebアプリURLとAPIキーを登録してください。</p>
+        <div class="md-card__title">先に Supabase の設定が必要です</div>
+        <p class="md-body-medium on-surface-variant">
+          プロジェクトURLと anon キーを登録してください。手順は docs/SUPABASE.md にあります。
+        </p>
         <a class="md-button md-button--filled md-button--block md-state" href="#/settings">
           ${icon('settings')}設定を開く
         </a>
@@ -31,21 +44,34 @@ export async function render(root) {
   }
 
   paint(root);
-
-  if (step === 'surname' && !knownUsers.length) {
+  if (step === 'list' && !profiles.length && !loading) {
+    loading = true;
     try {
-      knownUsers = (await api.listUsers()).users || [];
-      if (step === 'surname') paint(root);
-    } catch { /* 候補が出せなくても支障はない */ }
+      profiles = await auth.listProfiles();
+    } catch (err) {
+      snackbar(err.message, 'err');
+    } finally {
+      loading = false;
+      if (step === 'list' && liveRoot()) paint(liveRoot());
+    }
+  } else if (loading && step === 'list') {
+    // 読み込み中に再描画された場合、完了を待ってこちらの要素に描き直す
+    await waitForProfiles();
+    if (step === 'list' && liveRoot()) paint(liveRoot());
   }
+}
+
+/** 進行中の読み込みが終わるまで待つ */
+function waitForProfiles() {
+  return new Promise((resolve) => {
+    const tick = () => (loading ? setTimeout(tick, 80) : resolve());
+    tick();
+  });
 }
 
 function paint(root) {
   root.innerHTML = `<div class="ll-login">${
-    step === 'surname'  ? surnameStep()
-    : step === 'pin'    ? pinStep()
-    : step === 'register' ? registerStep()
-    : setPinStep()
+    step === 'list' ? listStep() : step === 'pin' ? pinStep() : registerStep()
   }</div>`;
   bind(root);
 }
@@ -55,38 +81,37 @@ const header = (title, sub) => `
   <h2 class="md-headline-small" style="margin:0 0 4px">${esc(title)}</h2>
   <p class="md-body-medium on-surface-variant" style="margin:0 0 24px">${sub}</p>`;
 
-/* ---------- 1. 苗字 ---------- */
+/* ---------- 1. 名前を選ぶ ---------- */
 
-function surnameStep() {
+function listStep() {
   return `
-    ${header('ようこそ', '苗字を入力してはじめてください。記録は苗字ごとに分けて保存されます。')}
-    <form id="surnameForm" autocomplete="off">
-      <div class="md-field">
-        <input class="md-field__input" id="surname" type="text" inputmode="latin"
-               autocapitalize="none" autocorrect="off" spellcheck="false"
-               placeholder="yamada" maxlength="20" value="${esc(ctx.surname)}">
-        <label class="md-field__label" for="surname">苗字（小文字のローマ字）</label>
-        <span class="md-field__support" id="surnameHelp">a〜z の小文字のみ・20文字以内（例: tanaka）</span>
-      </div>
-      <button class="md-button md-button--filled md-button--block md-button--tall md-state" type="submit">
-        ${icon('chevron')}次へ
-      </button>
-    </form>
-    ${knownUsers.length ? `
-      <h3 class="md-section-header">登録済み</h3>
-      <div class="md-chip-set">
-        ${knownUsers.map((u) => `
-          <button class="md-chip md-chip--assist md-state" data-surname="${esc(u.surname)}">
-            ${icon('person', 'icon--sm')}${esc(u.displayName || u.surname)}
-          </button>`).join('')}
-      </div>` : ''}`;
+    ${header('ようこそ', '名前を選んでください。記録は人ごとに分かれています。')}
+    ${profiles.length ? `
+      <div class="md-list" style="text-align:left">
+        ${profiles.map((p) => `
+          <div class="md-list-item md-state" data-profile="${esc(p.id)}" role="button" tabindex="0">
+            <span class="md-list-item__leading">${icon('person')}</span>
+            <div class="md-list-item__content">
+              <div class="md-list-item__headline">${esc(p.display_name)}</div>
+              <div class="md-list-item__supporting">${p.last_login_at ? '最終ログイン ' + new Date(p.last_login_at).toLocaleDateString('ja-JP') : '未ログイン'}</div>
+            </div>
+            <span class="md-list-item__trailing">${icon('chevron')}</span>
+          </div>`).join('')}
+      </div>` : `
+      <p class="md-body-medium on-surface-variant">${loading ? '読み込み中…' : 'まだ誰も登録されていません。'}</p>`}
+
+    <div class="ll-login__divider"><span>または</span></div>
+    <button class="md-button md-button--filled md-button--block md-button--tall md-state" id="toRegister">
+      ${icon('add')}新規登録する
+    </button>`;
 }
 
 /* ---------- 2. PIN or 覗き見 ---------- */
 
 function pinStep() {
   return `
-    ${header(`${esc(ctx.displayName)} さん`, `PINを入力すると記録できます。<br>見るだけなら PIN なしで「覗き見」を選んでください。`)}
+    ${header(`${esc(picked.display_name)} さん`,
+      'PINを入力すると記録できます。<br>見るだけなら PIN なしで「覗き見」を選んでください。')}
     <form id="pinForm" autocomplete="off">
       ${pinField('pin', 'PIN（数字4桁）')}
       <button class="md-button md-button--filled md-button--block md-button--tall md-state" type="submit">
@@ -101,7 +126,7 @@ function pinStep() {
       覗き見では記録の閲覧だけができます。ワークアウトの開始・記録・設定の変更はできません。
     </p>
     <button class="md-button md-button--text md-button--block md-state" id="backBtn" style="margin-top:16px">
-      ${icon('back')}苗字を入れ直す
+      ${icon('back')}名前を選び直す
     </button>`;
 }
 
@@ -109,12 +134,18 @@ function pinStep() {
 
 function registerStep() {
   return `
-    ${header('新規登録', `苗字「<b>${esc(ctx.surname)}</b>」で登録します。<br>氏名と、ログイン用の4桁PINを決めてください。`)}
+    ${header('新規登録', '氏名・メールアドレス・4桁PINを登録してください。')}
     <form id="registerForm" autocomplete="off">
       <div class="md-field">
         <input class="md-field__input" id="displayName" type="text" maxlength="40" placeholder="山田 太郎">
         <label class="md-field__label" for="displayName">氏名</label>
-        <span class="md-field__support">画面に表示される名前です。日本語でかまいません</span>
+        <span class="md-field__support">ログイン画面に表示される名前です</span>
+      </div>
+      <div class="md-field">
+        <input class="md-field__input" id="email" type="email" inputmode="email"
+               autocapitalize="none" autocorrect="off" placeholder="you@example.com">
+        <label class="md-field__label" for="email">メールアドレス</label>
+        <span class="md-field__support">今後のGoogleカレンダー連携に使います。他の人には表示されません</span>
       </div>
       ${pinField('pin', 'PIN（数字4桁）')}
       ${pinField('pin2', 'PIN（確認のためもう一度）')}
@@ -122,34 +153,8 @@ function registerStep() {
         ${icon('check')}登録してはじめる
       </button>
     </form>
-    <p class="md-body-small on-surface-variant" style="margin:12px 0 0">
-      PINを忘れた場合は、スプレッドシートの Users シートで該当行の pinHash / pinSalt を空にすると再設定できます。
-    </p>
     <button class="md-button md-button--text md-button--block md-state" id="backBtn" style="margin-top:16px">
-      ${icon('back')}苗字を入れ直す
-    </button>`;
-}
-
-/* ---------- 4. PIN未設定ユーザーの初期設定 ---------- */
-
-function setPinStep() {
-  return `
-    ${header('PINを設定してください', `「<b>${esc(ctx.surname)}</b>」はPINが未設定です。<br>これから使うPINを決めてください。記録はそのまま残ります。`)}
-    <form id="setPinForm" autocomplete="off">
-      <div class="md-field">
-        <input class="md-field__input" id="displayName" type="text" maxlength="40"
-               placeholder="山田 太郎" value="${esc(ctx.displayName === ctx.surname ? '' : ctx.displayName)}">
-        <label class="md-field__label" for="displayName">氏名</label>
-        <span class="md-field__support">未入力なら苗字がそのまま表示名になります</span>
-      </div>
-      ${pinField('pin', 'PIN（数字4桁）')}
-      ${pinField('pin2', 'PIN（確認のためもう一度）')}
-      <button class="md-button md-button--filled md-button--block md-button--tall md-state" type="submit">
-        ${icon('lock')}設定してログイン
-      </button>
-    </form>
-    <button class="md-button md-button--text md-button--block md-state" id="backBtn" style="margin-top:16px">
-      ${icon('back')}苗字を入れ直す
+      ${icon('back')}名前の一覧に戻る
     </button>`;
 }
 
@@ -164,141 +169,72 @@ const pinField = (id, label) => `
 
 function bind(root) {
   root.querySelectorAll('.ll-pin').forEach((el) => {
-    el.addEventListener('input', () => {
-      el.value = el.value.replace(/[^0-9]/g, '').slice(0, 4);
-    });
+    el.addEventListener('input', () => { el.value = auth.normalizePin(el.value); });
   });
 
-  root.querySelector('#backBtn')?.addEventListener('click', () => {
-    step = 'surname';
-    paint(root);
+  root.querySelector('#backBtn')?.addEventListener('click', () => { step = 'list'; paint(root); });
+  root.querySelector('#toRegister')?.addEventListener('click', () => { step = 'register'; paint(root); });
+
+  root.querySelector('.md-list')?.addEventListener('click', (ev) => {
+    const item = ev.target.closest('[data-profile]');
+    if (!item) return;
+    picked = profiles.find((p) => p.id === item.dataset.profile);
+    if (picked) { step = 'pin'; paint(root); }
   });
 
-  const surnameInput = root.querySelector('#surname');
-  if (surnameInput) {
-    const help = root.querySelector('#surnameHelp');
-    surnameInput.addEventListener('input', () => {
-      const v = normalizeSurname(surnameInput.value);
-      if (surnameInput.value !== v) surnameInput.value = v;
-      const ok = v === '' || SURNAME_RE.test(v);
-      help.textContent = ok
-        ? 'a〜z の小文字のみ・20文字以内（例: tanaka）'
-        : '使えるのは a〜z の小文字だけです。数字や記号は入力できません。';
-      help.style.color = ok ? '' : 'var(--md-sys-color-error)';
-    });
-    setTimeout(() => surnameInput.focus(), 50);
-  } else {
-    setTimeout(() => root.querySelector('#pin, #displayName')?.focus(), 50);
-  }
-
-  root.querySelector('#surnameForm')?.addEventListener('submit', (ev) => {
+  root.querySelector('#pinForm')?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    lookup(root, surnameInput.value);
-  });
-  root.querySelector('.md-chip-set')?.addEventListener('click', (ev) => {
-    const chip = ev.target.closest('[data-surname]');
-    if (chip) lookup(root, chip.dataset.surname);
-  });
-
-  root.querySelector('#pinForm')?.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    finish(root, { surname: ctx.surname, pin: root.querySelector('#pin').value });
-  });
-  root.querySelector('#peekBtn')?.addEventListener('click', () => {
-    finish(root, { surname: ctx.surname, mode: 'peek' });
-  });
-
-  root.querySelector('#registerForm')?.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    const displayName = root.querySelector('#displayName').value.trim();
     const pin = root.querySelector('#pin').value;
-    if (!displayName) return snackbar('氏名を入力してください', 'err');
-    if (!checkPinPair(root)) return;
-    finish(root, { surname: ctx.surname, confirmCreate: true, displayName, pin });
+    try {
+      await auth.login(picked, pin);
+      await enter(picked, `${picked.display_name} としてログインしました`, 'ok', '/home');
+    } catch (err) {
+      snackbar(err.message, 'err');
+      root.querySelector('#pin').value = '';
+    }
   });
 
-  root.querySelector('#setPinForm')?.addEventListener('submit', (ev) => {
+  root.querySelector('#peekBtn')?.addEventListener('click', async () => {
+    setPeekTarget(picked.id);
+    await enter(picked, `${picked.display_name} さんの記録を閲覧しています（編集はできません）`, '', '/dashboard');
+  });
+
+  root.querySelector('#registerForm')?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    if (!checkPinPair(root)) return;
     const displayName = root.querySelector('#displayName').value.trim();
-    finish(root, { surname: ctx.surname, newPin: root.querySelector('#pin').value, displayName });
+    const email = root.querySelector('#email').value.trim();
+    const pin = root.querySelector('#pin').value;
+    const pin2 = root.querySelector('#pin2').value;
+    if (pin !== pin2) { snackbar('確認用のPINが一致しません', 'err'); return; }
+    try {
+      const created = await auth.register({ displayName, email, pin });
+      const profile = await db.getProfile(created.id);
+      await enter(profile, `${displayName} を登録しました`, 'ok', '/home');
+    } catch (err) {
+      snackbar(err.message, 'err');
+    }
   });
+
+  setTimeout(() => root.querySelector('#pin, #displayName')?.focus(), 50);
 }
 
-function checkPinPair(root) {
-  const pin = root.querySelector('#pin').value;
-  const pin2 = root.querySelector('#pin2').value;
-  if (!/^\d{4}$/.test(pin)) { snackbar('PINは数字4桁で入力してください', 'err'); return false; }
-  if (pin !== pin2) { snackbar('確認用のPINが一致しません', 'err'); return false; }
-  return true;
-}
-
-/** 苗字を問い合わせて、次のステップを決める */
-async function lookup(root, raw) {
-  const surname = normalizeSurname(raw);
-  if (!SURNAME_RE.test(surname)) {
-    snackbar('苗字は a〜z の小文字のみで入力してください', 'err');
-    return;
-  }
-  ctx.surname = surname;
-
+/** プロフィールを現在の表示対象にして、アプリ本体へ進む */
+async function enter(profile, message, tone, path) {
+  state.profile = profile;
+  clearDraft();
   try {
-    const res = await api.login({ surname });
-
-    if (res.needsConfirm) {
-      const ok = await confirmDialog({
-        headline: `「${surname}」を新規登録しますか？`,
-        body: 'この苗字はまだ登録されていません。登録すると、あなた専用の記録シートが作成されます。'
-            + '入力ミスの場合は「キャンセル」を選んでください。',
-        confirmLabel: '新規登録する',
-        cancelLabel: '入力し直す'
-      });
-      if (!ok) return;
-      step = 'register';
-    } else if (res.needsPinSetup) {
-      ctx.displayName = res.user?.displayName || surname;
-      step = 'setPin';
-    } else {
-      ctx.displayName = res.user?.displayName || surname;
-      step = 'pin';
-    }
-    paint(root);
-  } catch (err) {
-    snackbar(err.message, 'err');
-  }
-}
-
-/** ログイン（本人・覗き見・登録）を確定して、アプリ本体へ進む */
-async function finish(root, payload) {
-  try {
-    const res = await api.login(payload);
-    setSession({ surname: res.surname, mode: res.mode, token: res.token });
-    clearDraft();
-    state.user = res.user || null;
     await bootstrap();
-
-    const name = res.user?.displayName || res.surname;
-    snackbar(
-      res.created ? `${name} を登録しました`
-      : res.mode === 'peek' ? `${name} さんの記録を閲覧しています（編集はできません）`
-      : res.pinSet ? `PINを設定しました。${name} としてログインしました`
-      : `${name} としてログインしました`,
-      res.mode === 'peek' ? '' : 'ok');
-
-    step = 'surname';
-    knownUsers = [];
-    navigate(res.mode === 'peek' ? '/dashboard' : '/home');
   } catch (err) {
     snackbar(err.message, 'err');
-    if (err.code === 'WRONG_PIN' || err.code === 'PIN_LOCKED') {
-      root.querySelector('#pin') && (root.querySelector('#pin').value = '');
-    }
   }
+  paintNetState();
+  snackbar(message, tone);
+  reset();
+  navigate(path);
 }
 
-/** 他の画面からログイン画面に戻るときに状態を初期化する */
-export function resetLogin() {
-  step = 'surname';
-  ctx = { surname: '', displayName: '' };
-  knownUsers = [];
+export function reset() {
+  step = 'list';
+  picked = null;
+  profiles = [];
 }

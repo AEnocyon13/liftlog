@@ -8,7 +8,7 @@
  */
 
 import { state, saveDraft, getRestMinutes, rememberRestMinutes } from './state.js';
-import { api } from './api.js';
+import { updateProfile } from './db.js';
 import { esc, icon } from './ui.js';
 
 export const MIN_MINUTES = 1;
@@ -69,8 +69,9 @@ export function setMinutes(min) {
 function queueServerSave(min) {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    api.saveUserSetting('restMinutes', min)
-      .then((res) => { if (res?.user) state.user = res.user; })
+    if (!state.profile) return;
+    updateProfile(state.profile.id, { rest_minutes: min })
+      .then((p) => { state.profile = p; })
       .catch(() => { /* オフラインでも端末側には残るので致命的ではない */ });
   }, 1500);
 }

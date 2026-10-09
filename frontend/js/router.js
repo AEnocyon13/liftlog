@@ -1,5 +1,5 @@
 /** router.js — ハッシュベースの簡易ルーター（ログインガード付き） */
-import { getUser, canEdit } from './state.js';
+import { getUserId, canEdit } from './state.js';
 
 const routes = {};
 let previous = null;
@@ -20,7 +20,7 @@ export async function handleRoute() {
   let route = routes[path] || routes['/home'];
 
   // ログインが必要な画面は、未ログインならログイン画面に置き換える
-  if (route.requiresUser && !getUser()) {
+  if (route.requiresUser && !getUserId()) {
     route = routes['/login'];
     if (location.hash !== '#/login') {
       location.replace('#/login');

@@ -1,6 +1,6 @@
 /** confirm.js — 今回のプラン（前回のセット・レップ + 重量アップ）の確認と確定 */
-import { state, saveDraft } from '../state.js';
-import { api } from '../api.js';
+import { state, saveDraft, menuConfig } from '../state.js';
+import * as db from '../db.js';
 import { esc, icon, snackbar, fmtNum, fmtDateJP, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
 import { navigate } from '../router.js';
@@ -22,8 +22,9 @@ export async function render(root) {
     root.innerHTML = `<div class="md-card md-card--filled">
       <p class="md-body-medium on-surface-variant" style="margin:0">前回の実績を読み込んでいます…</p></div>`;
     try {
+      const increment = Number(state.profile?.weight_increment) || 2.5;
       const results = await Promise.all(
-        draft.selection.map((s) => api.suggestion({ part: s.part, menu: s.menu }))
+        draft.selection.map((s) => db.suggestion(state.profile.id, menuConfig(s.part, s.menu) || s, increment))
       );
       draft.entries = results.map((r, i) => buildEntry(draft.selection[i], r));
       draft.status = 'confirming';
@@ -46,7 +47,7 @@ function buildEntry(sel, res) {
     part: sel.part,
     menu: sel.menu,
     suggestion: s,
-    config: res.menuConfig,
+    config: menuConfig(sel.part, sel.menu),
     weight: s.finalWeight ?? s.recommendedWeight ?? null,
     increment: s.increment ?? 2.5,
     plan: (s.plan || []).map((p) => ({ ...p })),
@@ -228,14 +229,14 @@ async function start(root) {
   }
 
   try {
-    const res = await api.startSession({
-      parts: [...new Set(draft.entries.map((e) => e.part))],
-      menus: draft.entries.map((e) => e.menu),
+    const workout = await db.startWorkout(state.profile.id, {
+      date: db.today(),
       restMinutes: draft.rest?.minutes
     });
-    draft.sessionId = res.sessionId;
-    draft.startTime = res.startTime;
-    draft.date = res.date;
+    state.workout = workout;
+    draft.workoutId = workout.id;
+    draft.startTime = workout.started_at;
+    draft.date = workout.date;
     draft.status = 'active';
     // 重量もレップも入力済みの状態でセット行を作る
     draft.entries.forEach((e) => {

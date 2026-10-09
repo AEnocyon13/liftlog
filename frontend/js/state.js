@@ -1,102 +1,72 @@
-/** state.js — アプリ状態、ログイン中ユーザー、進行中ワークアウトの下書き保存 */
+/** state.js — アプリ状態、表示中のユーザー、実施中ワークアウトの下書き */
 
 const LS_DRAFT = 'liftlog.draft';
-const LS_USER  = 'liftlog.user';
-const LS_MODE  = 'liftlog.mode';
-const LS_TOKEN = 'liftlog.token';
+const LS_PEEK  = 'liftlog.peek';
 const LS_REST  = 'liftlog.restMinutes';
 
 export const state = {
-  user: null,          // { surname, displayName, monthlyTargetWorkouts, weightIncrement, ... }
-  menus: [],
-  guides: [],
-  settings: {},
+  profile: null,       // 表示中のユーザーの profiles 行（本人 or 覗き見対象）
+  session: null,       // Supabase のセッション（覗き見なら null）
+  exercises: [],       // 種目＋解説
   dashboard: null,
-  serverOpenSession: null,
+  workout: null,       // 実施中の workouts 行
   picking: { part: null, selected: [] },
-  draft: null
+  draft: null          // 入力中の内容（サーバーにも自動保存される）
 };
 
-/* ---------- ログイン中の苗字とモード ---------- */
+/* ---------- 表示中のユーザーとモード ---------- */
 
-export function getUser() {
-  try { return localStorage.getItem(LS_USER) || null; } catch { return null; }
-}
+export const getUserId = () => state.profile?.id || null;
 
-/** 'auth'（本人・編集可） / 'peek'（覗き見・閲覧のみ） */
-export function getMode() {
-  try { return localStorage.getItem(LS_MODE) === 'peek' ? 'peek' : 'auth'; } catch { return 'auth'; }
-}
+export const getMode = () => (state.session ? 'auth' : 'peek');
 
-/** 書き込み権限を表すトークン。覗き見では null。 */
-export function getToken() {
-  try { return localStorage.getItem(LS_TOKEN) || null; } catch { return null; }
-}
+/** 編集できるか。自分のプロフィールを本人として見ているときだけ true。 */
+export const canEdit = () =>
+  Boolean(state.session && state.profile && state.session.user.id === state.profile.id);
 
-/** 編集できるか。覗き見とトークン切れのときは false。 */
-export function canEdit() {
-  return getMode() === 'auth' && Boolean(getToken());
-}
-
-export function setSession({ surname, mode, token }) {
+/** 覗き見対象を端末に覚えておく（リロードしても続く） */
+export function setPeekTarget(profileId) {
   try {
-    if (surname) localStorage.setItem(LS_USER, surname); else localStorage.removeItem(LS_USER);
-    localStorage.setItem(LS_MODE, mode === 'peek' ? 'peek' : 'auth');
-    if (token) localStorage.setItem(LS_TOKEN, token); else localStorage.removeItem(LS_TOKEN);
+    if (profileId) localStorage.setItem(LS_PEEK, profileId);
+    else localStorage.removeItem(LS_PEEK);
   } catch { /* プライベートモード等 */ }
 }
-
-/** トークンだけ捨てて覗き見に落とす（有効期限切れのとき） */
-export function demoteToPeek() {
-  setSession({ surname: getUser(), mode: 'peek', token: null });
-  clearDraft();
+export function getPeekTarget() {
+  try { return localStorage.getItem(LS_PEEK) || null; } catch { return null; }
 }
 
-/** ログアウト。下書きも破棄する（別ユーザーの記録に混ざらないように） */
-export function logout() {
-  try {
-    localStorage.removeItem(LS_USER);
-    localStorage.removeItem(LS_MODE);
-    localStorage.removeItem(LS_TOKEN);
-  } catch { /* noop */ }
-  state.user = null;
+export function resetSession() {
+  state.profile = null;
+  state.session = null;
   state.dashboard = null;
-  clearDraft();
+  state.workout = null;
   state.picking = { part: null, selected: [] };
+  setPeekTarget(null);
+  clearDraft();
 }
 
-/** 苗字のバリデーション（サーバー側 SURNAME_RE と同じ規則） */
-export const SURNAME_RE = /^[a-z]{1,20}$/;
-
-export function normalizeSurname(raw) {
-  return String(raw ?? '')
-    .replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[\s　]/g, '')
-    .toLowerCase();
-}
-
-/* ---------- 休憩時間（分）の引き継ぎ ---------- */
+/* ---------- 休憩時間の引き継ぎ ---------- */
 
 export function getRestMinutes() {
-  const fromUser = Number(state.user?.restMinutes);
-  if (isFinite(fromUser) && fromUser > 0) return fromUser;
+  const fromProfile = Number(state.profile?.rest_minutes);
+  if (isFinite(fromProfile) && fromProfile > 0) return fromProfile;
   const stored = Number(localStorage.getItem(LS_REST));
   return isFinite(stored) && stored > 0 ? stored : 3;
 }
 
 export function rememberRestMinutes(min) {
   try { localStorage.setItem(LS_REST, String(min)); } catch { /* noop */ }
-  if (state.user) state.user.restMinutes = min;
+  if (state.profile) state.profile.rest_minutes = min;
 }
 
-/* ---------- 進行中ワークアウト ---------- */
+/* ---------- 下書き ---------- */
+/* 端末内の控え。正本はサーバー（workouts.draft）で、こちらは通信できないときの保険。 */
 
 export function loadDraft() {
   try {
     const raw = localStorage.getItem(LS_DRAFT);
     const d = raw ? JSON.parse(raw) : null;
-    // 別のユーザーでログインし直したときの取り違えを防ぐ
-    state.draft = (d && d.owner && d.owner !== getUser()) ? null : d;
+    state.draft = (d && d.owner && d.owner !== getUserId()) ? null : d;
   } catch {
     state.draft = null;
   }
@@ -104,22 +74,23 @@ export function loadDraft() {
 }
 
 export function saveDraft() {
-  if (state.draft) localStorage.setItem(LS_DRAFT, JSON.stringify(state.draft));
-  else localStorage.removeItem(LS_DRAFT);
+  try {
+    if (state.draft) localStorage.setItem(LS_DRAFT, JSON.stringify(state.draft));
+    else localStorage.removeItem(LS_DRAFT);
+  } catch { /* 容量超過などは無視（正本はサーバー） */ }
 }
 
 export function clearDraft() {
   state.draft = null;
-  localStorage.removeItem(LS_DRAFT);
+  try { localStorage.removeItem(LS_DRAFT); } catch { /* noop */ }
 }
 
 export function newDraft(selection) {
   state.draft = {
-    owner: getUser(),
-    sessionId: null,
+    owner: getUserId(),
+    status: 'planning',          // planning -> confirming -> active
     startTime: null,
     date: null,
-    status: 'planning',           // planning -> confirming -> active
     selection,
     entries: [],
     memo: '',
@@ -129,23 +100,26 @@ export function newDraft(selection) {
   return state.draft;
 }
 
+/** サーバーに保存されていた下書きを復元する */
+export function adoptDraft(workout) {
+  if (!workout?.draft) return null;
+  state.draft = { ...workout.draft, owner: workout.user_id, status: 'active' };
+  saveDraft();
+  return state.draft;
+}
+
 /* ---------- 参照ヘルパー ---------- */
 
-export const partsOf = () => [...new Set(state.menus.map((m) => m.part))];
-
-export const menusOfPart = (part) => state.menus.filter((m) => m.part === part);
-
+export const partsOf = () => [...new Set(state.exercises.map((m) => m.part))];
+export const menusOfPart = (part) => state.exercises.filter((m) => m.part === part);
 export const menuConfig = (part, menu) =>
-  state.menus.find((m) => m.part === part && m.menu === menu) || null;
+  state.exercises.find((m) => m.part === part && m.menu === menu) || null;
 
 const norm = (s) => String(s || '').replace(/[\s　（）()]/g, '').toLowerCase();
 
 export function guideFor(part, menu) {
   const nm = norm(menu), np = norm(part);
-  return (
-    state.guides.find((g) => norm(g.menu) === nm && norm(g.part) === np) ||
-    state.guides.find((g) => norm(g.menu) === nm) ||
-    state.guides.find((g) => (g.aliases || []).some((a) => norm(a) === nm)) ||
-    null
-  );
+  const hit = state.exercises.find((e) => norm(e.menu) === nm && norm(e.part) === np)
+           || state.exercises.find((e) => norm(e.menu) === nm);
+  return hit?.guide || null;
 }
