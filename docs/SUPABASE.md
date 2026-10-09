@@ -38,6 +38,13 @@ Apps Script・スプレッドシート・解説用 Google ドキュメントは�
 もう一度 **New query** を開き、[`supabase/seed.sql`](../supabase/seed.sql) を貼って **Run**。
 Notion から取り込んだ**48種目と解説**が入ります。
 
+> **すでに schema.sql を流したあとに更新した場合**は、[`supabase/migrations/`](../supabase/migrations/)
+> の中を番号順に実行してください。何度実行しても安全です。
+>
+> | ファイル | 内容 |
+> |---|---|
+> | `001_exercise_author.sql` | 種目に「誰が追加したか」の列を足す（アプリから種目を登録できるようにしたため） |
+
 ### 確認
 
 左メニューの **Table Editor** に次が並んでいれば大丈夫です。
@@ -121,9 +128,21 @@ https://＜プロジェクト＞.supabase.co/auth/v1/settings?apikey=＜anonキ�
 
 ## 運用
 
-### 種目を増やす・解説を書く
+### 種目を増やす
 
-Table Editor で `exercises` に行を足し、`exercise_guides` に `exercise_id` を合わせて解説を入れます。
+**アプリから追加できます。** メニュー選択画面の「種目を追加する」か、ワークアウト中の
+「種目を追加する」→「新しい種目を登録する」で、部位と種目名を入れるだけです。
+部位は既存の6つから選ぶか、「新しい部位」で好きな名前を作れます。
+
+追加した種目は**全員の一覧に出ます**。器具・目標レップ・セット数は既定値（8〜12レップ × 3セット）
+で始まるので、こだわる場合は Table Editor の `exercises` で直してください。
+
+使わない種目は、メニュー選択画面の「整理」から一覧に出ないようにできます
+（`active` が false になるだけで、過去の記録は残ります）。同じ名前でもう一度登録すれば戻ります。
+
+### 解説を書く
+
+Table Editor で `exercise_guides` に `exercise_id` を合わせて行を足します。
 アプリの 設定 →「種目・解説を再読込」で反映されます。
 
 解説の原文は [notion-guide-source.md](notion-guide-source.md) にあります。

@@ -56,8 +56,15 @@ create table if not exists public.exercises (
   sort_order   int     not null default 999,
   part_order   int     not null default 999,
   active       boolean not null default true,
+  created_by   uuid references auth.users on delete set null,
+  created_at   timestamptz not null default now(),
   unique (part, name)
 );
+
+comment on column public.exercises.created_by is
+  'アプリから追加した場合の登録者。初期データ（Notion由来）は null。';
+comment on column public.exercises.active is
+  'false にすると選択肢から消える。過去の記録は workout_sets に残るので消えない。';
 
 -- ---------------------------------------------------------------------
 -- 4. 種目解説（Notion から取り込んだ内容）
@@ -178,12 +185,20 @@ drop policy if exists user_private_all on public.user_private;
 create policy user_private_all on public.user_private for all to authenticated
   using (auth.uid() = id) with check (auth.uid() = id);
 
--- 種目マスターと解説: 誰でも読める / 変更はログイン中のユーザーなら可
-drop policy if exists exercises_read  on public.exercises;
-drop policy if exists exercises_write on public.exercises;
-create policy exercises_read  on public.exercises for select using (true);
-create policy exercises_write on public.exercises for all to authenticated
+-- 種目マスター: 誰でも読める / 追加と「一覧から隠す」はログイン中なら可
+-- 行の削除だけは、追加した本人に限る（初期データは created_by が null なので消せない）
+drop policy if exists exercises_read   on public.exercises;
+drop policy if exists exercises_write  on public.exercises;
+drop policy if exists exercises_insert on public.exercises;
+drop policy if exists exercises_update on public.exercises;
+drop policy if exists exercises_delete on public.exercises;
+create policy exercises_read   on public.exercises for select using (true);
+create policy exercises_insert on public.exercises for insert to authenticated
+  with check (auth.uid() = created_by or created_by is null);
+create policy exercises_update on public.exercises for update to authenticated
   using (true) with check (true);
+create policy exercises_delete on public.exercises for delete to authenticated
+  using (auth.uid() = created_by);
 
 drop policy if exists guides_read  on public.exercise_guides;
 drop policy if exists guides_write on public.exercise_guides;

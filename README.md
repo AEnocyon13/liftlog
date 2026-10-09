@@ -16,6 +16,7 @@
 - **重量提案**：前回のセット数とレップをそのまま引き継ぎ、重量だけ自動で +2.5kg（増量幅は個人ごとに変更可）
 - **休憩タイマー**：分単位で設定し、終了時にバイブと音で通知。設定値は次回に引き継がれる
 - **月間レポート**：目標回数に対する達成度、部位別ボリューム、カレンダー、自己ベスト更新を可視化
+- **種目の追加**：メニュー選択中でもワークアウト中でも、その場で種目を登録できる。新しい部位も作れる
 - **種目解説**：Notion から取り込んだ48種目。解説・主働筋/補助筋・YouTubeリンクをボトムシートで表示
 
 ---
@@ -56,7 +57,8 @@ workout-app/
 ├── .github/workflows/pages.yml  frontend/ を GitHub Pages に自動デプロイ
 ├── supabase/
 │   ├── schema.sql               テーブル・インデックス・RLSポリシー・集計ビュー
-│   └── seed.sql                 種目48件と解説（Notion から取り込み）
+│   ├── seed.sql                 種目48件と解説（Notion から取り込み）
+│   └── migrations/              schema.sql を流したあとの差分SQL
 ├── frontend/                    ← GitHub Pages にそのまま置く静的サイト
 │   ├── index.html               SPAのシェル（Top app bar・Navigation bar・
 │   │                            ボトムシート・スナックバー・SVGアイコンスプライト）
@@ -78,7 +80,8 @@ workout-app/
 │       └── views/
 │           ├── login.js         名前を選んでログイン / 覗き見 / 新規登録
 │           ├── home.js          ホーム（開始ボタン + 今月サマリ）
-│           ├── select.js        部位・メニュー選択
+│           ├── select.js        部位・メニュー選択（種目の追加・整理）
+│           ├── exercisePicker.js 種目の新規登録と、ワークアウト中の種目選択
 │           ├── confirm.js       今回のプラン（重量・セット・レップ）の確認と上書き
 │           ├── session.js       実行中の記録（経過時間 / 休憩タイマー / 自動保存）
 │           ├── dashboard.js     月間レポート

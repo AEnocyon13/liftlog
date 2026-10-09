@@ -29,8 +29,8 @@ defineRoutes({
 });
 
 /** 種目一覧は全員共通なので、ログインしていなくても読める */
-export async function loadCatalog() {
-  if (!state.exercises.length) state.exercises = await db.loadExercises();
+export async function loadCatalog(force = false) {
+  if (force || !state.exercises.length) state.exercises = await db.loadExercises();
   return state.exercises;
 }
 

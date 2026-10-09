@@ -4,6 +4,7 @@ import * as db from '../db.js';
 import { startAutosave, stopAutosave, touch, flushNow, autosaveState } from '../autosave.js';
 import { esc, icon, snackbar, confirmDialog, fmtNum, fmtDuration, fmtVolume, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
+import { openExercisePicker } from './exercisePicker.js';
 import { navigate } from '../router.js';
 import { resetPicking } from './select.js';
 import { restTimerHtml, startTicking, stopTicking, handleRestClick } from '../restTimer.js';
@@ -97,6 +98,10 @@ function paint(root) {
     ${restTimerHtml()}
 
     ${draft.entries.map((e, ei) => entryCard(e, ei)).join('')}
+
+    <button class="md-button md-button--outlined md-button--block md-state" id="addExerciseBtn" style="margin-top:4px">
+      ${icon('add')}種目を追加する
+    </button>
 
     <div class="md-field" style="margin-top:24px">
       <textarea class="md-field__input" rows="2" data-act="memo" id="sessionMemo"
@@ -218,6 +223,7 @@ function onClick(ev) {
   if (handleRestClick(ev.target)) return paintAndRebind(root);
   if (ev.target.closest('#finishBtn')) return finish(root);
   if (ev.target.closest('#abortBtn')) return abort();
+  if (ev.target.closest('#addExerciseBtn')) return addExercise(root);
 
   const btn = ev.target.closest('[data-act]');
   if (!btn) return;
@@ -246,6 +252,51 @@ function onClick(ev) {
   saveDraft();
   touch();
   paintAndRebind(root);
+}
+
+/**
+ * ワークアウト中に種目を足す。
+ * 履歴があれば通常の開始時と同じく、前回のセット数・レップを引き継いで重量だけ上げた状態で入る。
+ */
+function addExercise(root) {
+  openExercisePicker({
+    exclude: state.draft.entries.map((e) => ({ part: e.part, menu: e.menu })),
+    onPick: async (picked) => {
+      try {
+        const increment = Number(state.profile?.weight_increment) || 2.5;
+        const { suggestion } = await db.suggestion(state.profile.id, picked, increment);
+        state.draft.entries.push({
+          part: picked.part,
+          menu: picked.menu,
+          suggestion,
+          config: picked,
+          weight: suggestion.finalWeight ?? null,
+          increment: suggestion.increment ?? increment,
+          plan: (suggestion.plan || []).map((p) => ({ ...p })),
+          sets: (suggestion.plan || []).map((p, i) => ({
+            setNo: i + 1,
+            weight: p.weight ?? null,
+            reps: p.reps === '' || p.reps == null ? '' : p.reps,
+            rpe: '',
+            isWarmup: false
+          }))
+        });
+        saveDraft();
+        touch();
+        paintAndRebind(root);
+        snackbar(suggestion.status === 'carry_over'
+          ? `${picked.menu} を追加しました（前回 ${fmtNum(suggestion.baseWeight)}kg → ${fmtNum(suggestion.finalWeight)}kg）`
+          : `${picked.menu} を追加しました（履歴が無いので重量を入力してください）`, 'ok');
+        // 追加した種目までスクロールする
+        requestAnimationFrame(() => {
+          const cards = root.querySelectorAll('[data-entry]');
+          cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      } catch (err) {
+        snackbar(err.message, 'err');
+      }
+    }
+  });
 }
 
 function renumber(entry) {

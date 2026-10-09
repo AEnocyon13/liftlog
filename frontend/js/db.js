@@ -24,7 +24,7 @@ export const thisMonth = () => today().slice(0, 7);
 export async function loadExercises() {
   const { data, error } = await sb()
     .from('exercises')
-    .select('id, part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order,'
+    .select('id, part, name, equipment, rep_min, rep_max, default_sets, sort_order, part_order, created_by,'
           + ' exercise_guides ( description, muscles, assist_muscles, points, cautions, videos, tags )')
     .eq('active', true)
     .order('part_order').order('sort_order');
@@ -38,6 +38,7 @@ export async function loadExercises() {
     repMin: e.rep_min,
     repMax: e.rep_max,
     defaultSets: e.default_sets,
+    createdBy: e.created_by || null,
     guide: e.exercise_guides ? {
       part: e.part,
       menu: e.name,
@@ -51,6 +52,54 @@ export async function loadExercises() {
       tags: e.exercise_guides.tags || []
     } : null
   }));
+}
+
+/**
+ * 種目を1件追加する。部位は既存のものでも新しい名前でもよい。
+ * 器具・目標レップ・セット数は既定値で始め、必要なら Supabase の表画面で直す。
+ */
+export async function createExercise({ part, name, userId }) {
+  const p = String(part || '').trim();
+  const n = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!p) throw new Error('部位を選ぶか入力してください。');
+  if (!n) throw new Error('種目名を入力してください。');
+  if (n.length > 40) throw new Error('種目名は40文字以内にしてください。');
+
+  const client = sb();
+
+  // 同じ部位・種目名が「隠されている」状態で残っていたら、作り直さず戻す
+  const { data: existing } = await client.from('exercises')
+    .select('id, active').eq('part', p).eq('name', n).maybeSingle();
+  if (existing) {
+    if (existing.active) throw new Error(`「${p} / ${n}」はすでに登録されています。`);
+    const { error } = await client.from('exercises').update({ active: true }).eq('id', existing.id);
+    throwIf(error, '種目の復帰');
+    return { id: existing.id, part: p, name: n, restored: true };
+  }
+
+  // 同じ部位の末尾に並ぶようにする
+  const { data: siblings } = await client.from('exercises')
+    .select('sort_order, part_order').eq('part', p).order('sort_order', { ascending: false }).limit(1);
+  const { data: parts } = await client.from('exercises')
+    .select('part_order').order('part_order', { ascending: false }).limit(1);
+
+  const { data, error } = await client.from('exercises').insert({
+    part: p,
+    name: n,
+    sort_order: (siblings?.[0]?.sort_order ?? 0) + 1,
+    part_order: siblings?.[0]?.part_order ?? ((parts?.[0]?.part_order ?? 0) + 1),
+    active: true,
+    created_by: userId
+  }).select().single();
+  if (error?.code === '23505') throw new Error(`「${p} / ${n}」はすでに登録されています。`);
+  throwIf(error, '種目の追加');
+  return { id: data.id, part: data.part, name: data.name, restored: false };
+}
+
+/** 一覧から隠す。過去の記録は workout_sets に残るので消えない。 */
+export async function hideExercise(id) {
+  const { error } = await sb().from('exercises').update({ active: false }).eq('id', id);
+  throwIf(error, '種目を隠す');
 }
 
 /* ---------- プロフィール ---------- */
