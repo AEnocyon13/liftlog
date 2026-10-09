@@ -1,6 +1,7 @@
 /** guide.js — メニュー解説（ボトムシート & 一覧画面） */
 import { state, guideFor } from '../state.js';
 import { esc, icon, openSheet, emptyState } from '../ui.js';
+import { loadCatalog } from '../app.js';
 
 export function showGuide(part, menu) {
   const g = guideFor(part, menu);
@@ -73,8 +74,22 @@ function summaryOf(g) {
   return '解説なし';
 }
 
-/** 種目解説の一覧画面 */
-export function render(root) {
+/** 種目解説の一覧画面。ログインしていなくても見られるので、必要なら自分で読み込む。 */
+export async function render(root) {
+  if (!state.exercises.length) {
+    root.innerHTML = `<div class="md-card md-card--filled">
+      <p class="md-body-medium on-surface-variant" style="margin:0">読み込み中…</p></div>`;
+    try {
+      await loadCatalog();
+    } catch (err) {
+      root.innerHTML = `<div class="md-card md-card--filled">
+        <div class="md-card__title" style="color:var(--md-sys-color-error)">読み込みエラー</div>
+        <p class="md-body-medium on-surface-variant">${esc(err.message)}</p></div>`;
+      return;
+    }
+    root = document.querySelector('#view') || root;   // 待っている間に差し替わっている場合に備える
+  }
+
   const guides = (state.exercises || []).map((e) => e.guide || {
     part: e.part, menu: e.menu, key: `${e.part}::${e.menu}`,
     description: '', muscles: [], assistMuscles: [], points: [], cautions: [], videos: [], tags: []
