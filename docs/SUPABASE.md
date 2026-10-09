@@ -77,9 +77,15 @@ profiles  user_private  exercises  exercise_guides  workouts  workout_sets
 2. 自動で設定画面が出るので、**Supabase 接続**に URL と anon キーを貼り付けて「保存して接続」
 3. 「接続しました（種目 48 件）」と出れば成功
 
-毎回貼るのが面倒なら、[`frontend/js/config.js`](../frontend/js/config.js) の
-`DEFAULT_SUPABASE` に書いてコミットしても構いません。anon キーは公開前提の鍵なので、
-GitHub に入れても問題ありません。
+**このリポジトリでは `frontend/js/config.js` に設定済み**なので、通常は何も入力せずに使えます。
+設定画面での入力は、別のプロジェクトに向けたいときの上書き用です（localStorage が優先されます）。
+
+> **URL はプロジェクトURLだけ**を入れてください。ダッシュボードには `.../rest/v1/` 付きで
+> 表示される箇所もありますが、supabase-js にはパスを含めずに渡す必要があります
+> （貼り間違えても自動で落とすようにしてあります）。
+>
+> **`service_role` キーは絶対に貼らないでください。** config.js に入れてよいのは
+> `anon`（`"role":"anon"` を含むJWT）だけです。
 
 ## 6. 最初のユーザーを登録する
 
