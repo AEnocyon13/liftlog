@@ -6,6 +6,12 @@ let previous = null;
 
 export function defineRoutes(map) { Object.assign(routes, map); }
 
+/** そのパスがログインを必要とするか（未ログイン時のリダイレクト判定に使う） */
+export function routeRequiresUser(path) {
+  const route = routes[path] || routes['/home'];
+  return Boolean(route?.requiresUser);
+}
+
 export function currentPath() {
   return (location.hash || '').replace(/^#/, '') || '/home';
 }

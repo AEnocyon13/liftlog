@@ -6,7 +6,7 @@ import * as db from './db.js';
 import { state, getPeekTarget, setPeekTarget, canEdit, resetSession, loadDraft, adoptDraft } from './state.js';
 import { initOverlayEvents, snackbar, $ } from './ui.js';
 import { initTheme } from './theme.js';
-import { defineRoutes, startRouter, navigate, currentPath } from './router.js';
+import { defineRoutes, startRouter, navigate, currentPath, routeRequiresUser } from './router.js';
 
 import * as login from './views/login.js';
 import * as home from './views/home.js';
@@ -135,8 +135,9 @@ async function init() {
     return;
   }
   if (!restored) {
-    // すでに /login を表示しているときに navigate すると二重描画になる
-    if (currentPath() !== '/settings' && currentPath() !== '/login') navigate('/login');
+    // ログインが要らない画面（種目解説・設定）は、そのまま表示する。
+    // すでに /login を表示しているときに navigate すると二重描画になる。
+    if (routeRequiresUser(currentPath()) && currentPath() !== '/login') navigate('/login');
     return;
   }
   if (currentPath() === '/login') navigate('/home');
