@@ -3,7 +3,7 @@ import { state, canEdit } from '../state.js';
 import * as db from '../db.js';
 import * as gcal from '../googleCalendar.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP,
-         snackbar, emptyState, confirmDialog } from '../ui.js';
+         snackbar, emptyState, confirmDialog, openSheet } from '../ui.js';
 
 let viewMonth = null;
 
@@ -81,7 +81,9 @@ function paint(root, d) {
         ${Array.from({ length: d.calendar[0].dow }, () => '<div></div>').join('')}
         ${d.calendar.map((c) => {
           const lv = c.volume === 0 ? 0 : Math.min(4, Math.ceil((c.volume / maxVol) * 4));
-          return `<div class="ll-calendar__day ${lv ? `ll-calendar__day--l${lv}` : ''} ${isToday(c.date) ? 'll-calendar__day--today' : ''}"
+          const clickable = c.sets > 0;
+          return `<div class="ll-calendar__day ${lv ? `ll-calendar__day--l${lv}` : ''} ${isToday(c.date) ? 'll-calendar__day--today' : ''} ${clickable ? 'll-calendar__day--open md-state' : ''}"
+                       ${clickable ? `data-day="${esc(c.date)}" role="button" tabindex="0"` : ''}
                        title="${esc(c.date)} ${fmtVolume(c.volume)} ${esc(c.parts.join(','))}">${c.day}</div>`;
         }).join('')}
       </div>
@@ -90,6 +92,9 @@ function paint(root, d) {
         ${[0, 1, 2, 3, 4].map((l) => `<span class="ll-calendar__day ${l ? `ll-calendar__day--l${l}` : ''}"></span>`).join('')}
         <span class="md-body-small on-surface-variant">多</span>
       </div>
+      <p class="md-body-small on-surface-variant" style="margin:8px 0 0;text-align:center">
+        色の付いた日をタップすると、その日の内容が見られます
+      </p>
     </div>
 
     <h2 class="md-section-header">部位別ボリューム</h2>
@@ -135,7 +140,7 @@ function paint(root, d) {
       <h2 class="md-section-header">${esc(d.monthLabel)}のワークアウト</h2>
       <div class="md-list">
         ${d.recentWorkouts.map((w) => `
-          <div class="md-list-item md-list-item--static" data-workout="${esc(w.id)}">
+          <div class="md-list-item md-state" data-day="${esc(w.date)}" role="button" tabindex="0">
             <span class="md-list-item__leading">${icon('calendar')}</span>
             <div class="md-list-item__content">
               <div class="md-list-item__headline">${fmtDateJP(w.date)}　${esc(w.parts.join(' / ') || '—')}</div>
@@ -166,9 +171,21 @@ function paint(root, d) {
     </button>
   `;
 
+  // キーボード操作でも日付を開けるようにする
+  root.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const day = ev.target.closest?.('[data-day]');
+    if (!day) return;
+    ev.preventDefault();
+    openDayDetail(day.dataset.day);
+  });
+
   root.addEventListener('click', async (ev) => {
     const del = ev.target.closest('[data-del]');
-    if (del) return deleteWorkout(root, d, del.dataset.del, del.dataset.date);
+    if (del) { ev.stopPropagation(); return deleteWorkout(root, d, del.dataset.del, del.dataset.date); }
+
+    const day = ev.target.closest('[data-day]');
+    if (day) return openDayDetail(day.dataset.day);
 
     const nav = ev.target.closest('[data-nav]');
     if (nav) {
@@ -186,6 +203,67 @@ function paint(root, d) {
     }
   });
 }
+
+/** その日の内容をボトムシートで見せる */
+async function openDayDetail(date) {
+  openSheet(`<h2 class="md-dialog__headline" id="sheetTitle">${fmtDateJP(date)}</h2>
+    <p class="md-dialog__body">読み込み中…</p>`);
+  try {
+    const d = await db.workoutDetail(state.profile.id, date);
+    openSheet(dayDetailHtml(d));
+  } catch (err) {
+    openSheet(`<h2 class="md-dialog__headline" id="sheetTitle">${fmtDateJP(date)}</h2>
+      <p class="md-dialog__body" style="color:var(--md-sys-color-error)">${esc(err.message)}</p>`);
+  }
+}
+
+function dayDetailHtml(d) {
+  const w = d.workout;
+  const time = (w && w.started_at && w.ended_at)
+    ? `${hhmm(w.started_at)} 〜 ${hhmm(w.ended_at)}`
+    : null;
+  const parts = [...new Set(d.entries.map((e) => e.part))];
+
+  return `
+    <h2 class="md-dialog__headline" id="sheetTitle">${fmtDateJP(d.date)}</h2>
+    <div class="md-chip-set" style="margin-bottom:16px">
+      ${parts.map((p) => `<span class="md-chip md-chip--tonal">${esc(p)}</span>`).join('')}
+      ${time ? `<span class="md-chip md-chip--static">${icon('timer', 'icon--sm')}${esc(time)}</span>` : ''}
+      ${w?.duration_min ? `<span class="md-chip md-chip--static">${w.duration_min}分</span>` : ''}
+    </div>
+
+    <div class="ll-stat-grid" style="margin-bottom:16px">
+      <div class="ll-stat"><div class="ll-stat__value num">${fmtVolume(d.totals.volume)}</div><div class="ll-stat__label">ボリューム</div></div>
+      <div class="ll-stat"><div class="ll-stat__value num">${d.totals.sets}</div><div class="ll-stat__label">セット</div></div>
+      <div class="ll-stat"><div class="ll-stat__value num">${d.totals.reps}</div><div class="ll-stat__label">レップ</div></div>
+    </div>
+
+    ${d.entries.length ? d.entries.map((e) => `
+      <div class="md-card md-card--filled" style="margin-bottom:8px">
+        <div class="ll-row ll-row--between" style="margin-bottom:8px">
+          <span class="md-title-small">${esc(e.menu)}</span>
+          <span class="md-body-small on-surface-variant">${esc(e.part)}</span>
+        </div>
+        <div class="ll-stack" style="gap:4px">
+          ${e.sets.map((s2) => `
+            <div class="ll-row ll-row--between md-body-medium">
+              <span class="on-surface-variant">${s2.isWarmup ? 'W' : s2.setNo}</span>
+              <span class="num">${fmtNum(s2.weight)}kg × ${s2.reps}${s2.rpe ? `　RPE ${s2.rpe}` : ''}</span>
+            </div>`).join('')}
+        </div>
+      </div>`).join('')
+    : `<p class="md-body-medium on-surface-variant">この日の記録は見つかりませんでした。</p>`}
+
+    ${w?.memo ? `
+      <h3 class="md-section-header">メモ</h3>
+      <p class="md-body-medium" style="margin:0;white-space:pre-wrap">${esc(w.memo)}</p>` : ''}
+    ${w?.calendar_event_id ? `
+      <p class="md-body-small on-surface-variant" style="margin:16px 0 0">
+        ${icon('calendar', 'icon--sm')} Googleカレンダーに登録済み
+      </p>` : ''}`;
+}
+
+const hhmm = (iso) => new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
 /** 記録を削除する。カレンダーに予定を作っていれば、そちらも消す。 */
 async function deleteWorkout(root, d, id, date) {

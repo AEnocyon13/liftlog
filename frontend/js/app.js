@@ -7,6 +7,7 @@ import { state, getPeekTarget, setPeekTarget, canEdit, resetSession, loadDraft, 
 import { initOverlayEvents, snackbar, $ } from './ui.js';
 import { warmUpToken } from './googleCalendar.js';
 import { initTheme } from './theme.js';
+import { initKeyboardHandling } from './keyboard.js';
 import { defineRoutes, startRouter, navigate, currentPath, routeRequiresUser } from './router.js';
 
 import * as login from './views/login.js';
@@ -95,6 +96,7 @@ async function restoreSession() {
 async function init() {
   initTheme();
   initOverlayEvents();
+  initKeyboardHandling();
 
   if (!isConfigured()) {
     paintNetState();

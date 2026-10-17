@@ -40,6 +40,10 @@ export function openSheet(html) {
   $('#sheetBody').innerHTML = html;
   $('#scrim').hidden = false;
   document.body.style.overflow = 'hidden';
+  // 前回開いたときのスクロール位置が残らないよう、必ず先頭から見せる
+  const sheet = $('#scrim .md-sheet');
+  if (sheet) sheet.scrollTop = 0;
+  $('#sheetBody').scrollTop = 0;
 }
 export function closeSheet() {
   $('#scrim').hidden = true;

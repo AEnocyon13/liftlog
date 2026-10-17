@@ -776,6 +776,7 @@ textarea.md-field__input { height: auto; min-height: 80px; resize: vertical; }
 .ll-calendar__day--l3 { background: color-mix(in srgb, var(--md-sys-color-primary) 72%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-primary); }
 .ll-calendar__day--l4 { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); font-weight: 500; }
 .ll-calendar__day--today { border-color: var(--md-sys-color-tertiary); }
+.ll-calendar__day--open { cursor: pointer; position: relative; overflow: hidden; }
 .ll-calendar__legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 12px; }
 .ll-calendar__legend .ll-calendar__day { width: 14px; height: 14px; aspect-ratio: auto; border-radius: 3px; }
 
@@ -893,6 +894,24 @@ textarea.md-field__input { height: auto; min-height: 80px; resize: vertical; }
   margin-left: auto; min-width: 0; text-align: right;
   color: var(--md-sys-color-on-surface-variant);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------------
+   入力中（スマホでキーボードが出ているとき）
+   貼り付いている要素が入力欄を覆わないように外す。
+   --------------------------------------------------------------------- */
+body.is-typing .ll-sticky-actions,
+body.is-typing .md-navigation-bar { display: none; }
+
+/* 休憩タイマーは貼り付きをやめて、その場に置く */
+body.is-typing .ll-rest { position: static; }
+
+/* ブラウザが自動で画面を送るときに、上下の貼り付き要素の分だけ余白を見てもらう */
+.md-field__input,
+.ll-plan__reps,
+.md-stepper__value {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 140px;
 }
 
 /* 動きを減らす設定の尊重 */

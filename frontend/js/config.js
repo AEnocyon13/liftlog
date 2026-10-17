@@ -19,7 +19,7 @@ export const DEFAULT_SUPABASE = {
  * 作り方は docs/GOOGLE_CALENDAR.md。空のままなら連携機能は出ません。
  */
 export const DEFAULT_GOOGLE = {
-  clientId: ''    // 例: '1234567890-abcdefg.apps.googleusercontent.com'
+  clientId: '317871630899-kfpr0k353qpirgo1jg2n8ihb5se75ls7.apps.googleusercontent.com'
 };
 
 const LS_GOOGLE = 'liftlog.google';

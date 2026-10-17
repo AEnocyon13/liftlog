@@ -254,6 +254,54 @@ export async function deleteWorkout(workoutId) {
   throwIf(error, 'ワークアウトの削除');
 }
 
+/**
+ * ある日のワークアウトの中身を取り出す。
+ * セットは保存した順（id順）に並ぶので、同じ種目の連続をまとめればその日の流れになる。
+ */
+export async function workoutDetail(userId, date) {
+  const client = sb();
+  const [wRes, sRes] = await Promise.all([
+    client.from('workouts')
+      .select('id, date, started_at, ended_at, duration_min, total_sets, total_volume, memo, rest_minutes, calendar_event_id')
+      .eq('user_id', userId).eq('date', date).eq('status', 'finished')
+      .order('started_at', { ascending: false }).limit(1).maybeSingle(),
+    client.from('workout_sets')
+      .select('id, part, exercise, set_no, weight, reps, rpe, is_warmup, volume, est_1rm')
+      .eq('user_id', userId).eq('date', date).order('id')
+  ]);
+  throwIf(wRes.error, 'ワークアウトの読み込み');
+  throwIf(sRes.error, 'セットの読み込み');
+
+  const entries = [];
+  (sRes.data || []).forEach((row) => {
+    const last = entries[entries.length - 1];
+    if (!last || last.part !== row.part || last.menu !== row.exercise) {
+      entries.push({ part: row.part, menu: row.exercise, sets: [] });
+    }
+    entries[entries.length - 1].sets.push({
+      setNo: row.set_no,
+      weight: Number(row.weight),
+      reps: row.reps,
+      rpe: row.rpe == null ? null : Number(row.rpe),
+      isWarmup: row.is_warmup,
+      volume: Number(row.volume || 0),
+      est1RM: row.est_1rm == null ? null : Number(row.est_1rm)
+    });
+  });
+
+  const work = (sRes.data || []).filter((r) => !r.is_warmup);
+  return {
+    date,
+    workout: wRes.data || null,
+    entries,
+    totals: {
+      sets: work.length,
+      volume: round1(work.reduce((a, r) => a + Number(r.volume || 0), 0)),
+      reps: work.reduce((a, r) => a + r.reps, 0)
+    }
+  };
+}
+
 /* ---------- 月間レポート ---------- */
 
 export async function dashboard(userId, month) {
