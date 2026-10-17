@@ -25,9 +25,14 @@ create table if not exists public.profiles (
   rest_minutes            int          not null default 3    check (rest_minutes between 1 and 15),
   monthly_target_workouts int          not null default 12   check (monthly_target_workouts between 1 and 31),
   monthly_target_volume   numeric      not null default 0    check (monthly_target_volume >= 0),
+  calendar_id             text,
+  calendar_summary        text,
   created_at              timestamptz  not null default now(),
   last_login_at           timestamptz
 );
+
+comment on column public.profiles.calendar_id is
+  'Google カレンダーのID。null なら連携していない。';
 
 comment on table  public.profiles is 'ログイン画面に出す公開プロフィール。個人を特定できる情報は入れない。';
 comment on column public.profiles.auth_email is 'Supabase Auth 用の合成アドレス（実在しない）。本物のメールは user_private。';
@@ -99,8 +104,12 @@ create table if not exists public.workouts (
   total_sets   int,
   total_volume numeric,
   duration_min int,
+  calendar_event_id text,
   updated_at   timestamptz not null default now()
 );
+
+comment on column public.workouts.calendar_event_id is
+  '作成した Google カレンダーの予定ID。記録を消すときに予定も消すために使う。';
 
 -- 実施中のワークアウトは1人1件まで（置き忘れを防ぐ）
 create unique index if not exists workouts_one_active_per_user

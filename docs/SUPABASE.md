@@ -44,6 +44,7 @@ Notion から取り込んだ**48種目と解説**が入ります。
 > | ファイル | 内容 |
 > |---|---|
 > | `001_exercise_author.sql` | 種目に「誰が追加したか」の列を足す（アプリから種目を登録できるようにしたため） |
+> | `002_google_calendar.sql` | カレンダー連携の列を足す（書き込み先のカレンダーと、作った予定のID） |
 
 ### 確認
 
@@ -148,6 +149,11 @@ Table Editor で `exercise_guides` に `exercise_id` を合わせて行を足し
 解説の原文は [notion-guide-source.md](notion-guide-source.md) にあります。
 入れ直したいときは `supabase/seed.sql` をもう一度流せば上書きされます
 （手で書いた解説も上書きされるので注意）。
+
+### Googleカレンダーと連携する
+
+任意です。設定すると、ワークアウト終了時に予定が自動で作られます。
+手順は [GOOGLE_CALENDAR.md](GOOGLE_CALENDAR.md)。
 
 ### PINを忘れたとき
 

@@ -1,6 +1,9 @@
 /** settings.js — ユーザー / PIN / 表示テーマ / Supabase接続 / トレーニング設定 */
 import { state, canEdit, getMode, resetSession, rememberRestMinutes } from '../state.js';
-import { getSupabaseConfig, setSupabaseConfig, isConfigured } from '../config.js';
+import { getSupabaseConfig, setSupabaseConfig, isConfigured,
+         getGoogleConfig, setGoogleConfig, isGoogleConfigured } from '../config.js';
+import * as gcal from '../googleCalendar.js';
+import { openSheet, closeSheet } from '../ui.js';
 import * as auth from '../auth.js';
 import * as db from '../db.js';
 import { esc, icon, snackbar, confirmDialog, fmtNum } from '../ui.js';
@@ -75,6 +78,8 @@ function paint(root) {
           </button>
         </div>` : ''}
 
+      ${editable ? googleSection(p) : ''}
+
       <h2 class="md-section-header">トレーニング設定</h2>
       <div class="md-card md-card--elevated">
         ${peeking ? `<div class="ll-peek-notice">${icon('eye', 'icon--sm')}覗き見中は変更できません</div>` : ''}
@@ -144,6 +149,119 @@ function paint(root) {
     </div>
   `;
   bind(root);
+}
+
+/** Google カレンダー連携の節 */
+function googleSection(p) {
+  const g = getGoogleConfig();
+  const linked = Boolean(p.calendar_id);
+  return `
+    <h2 class="md-section-header">Googleカレンダー</h2>
+    <div class="md-card md-card--elevated">
+      ${isGoogleConfigured() ? `
+        ${linked ? `
+          <div class="md-list-item md-list-item--static" style="margin:0;background:transparent;padding:0">
+            <span class="md-list-item__leading">${icon('calendar')}</span>
+            <div class="md-list-item__content">
+              <div class="md-list-item__headline">${esc(p.calendar_summary || p.calendar_id)}</div>
+              <div class="md-list-item__supporting">ワークアウト終了時に自動で追加されます</div>
+            </div>
+            <span class="md-chip md-chip--tonal">${icon('check', 'icon--sm')}連携中</span>
+          </div>
+          <div class="ll-row" style="margin-top:12px">
+            <button class="md-button md-button--outlined md-state ll-grow" id="pickCalendar">
+              ${icon('calendar')}カレンダーを変更
+            </button>
+            <button class="md-button md-button--text md-button--danger md-state" id="unlinkCalendar">連携を解除</button>
+          </div>
+        ` : `
+          <p class="md-body-medium on-surface-variant" style="margin-top:0">
+            連携すると、ワークアウトを終了したときに「筋トレ（胸・背中）」のような予定が
+            自動で作られます。説明欄には種目ごとの重量とレップが入ります。
+          </p>
+          <button class="md-button md-button--filled md-button--block md-state" id="pickCalendar">
+            ${icon('calendar')}Googleカレンダーと連携する
+          </button>
+        `}
+      ` : `
+        <p class="md-body-medium on-surface-variant" style="margin-top:0">
+          連携するには Google の OAuth クライアントIDが必要です。作り方は docs/GOOGLE_CALENDAR.md。
+        </p>
+        <div class="md-field">
+          <input class="md-field__input" id="gClientId" type="text"
+                 placeholder="1234567890-abcdefg.apps.googleusercontent.com" value="${esc(g.clientId)}">
+          <label class="md-field__label" for="gClientId">OAuth クライアントID</label>
+          <span class="md-field__support">公開してよい識別子です（秘密鍵ではありません）</span>
+        </div>
+        <button class="md-button md-button--filled md-button--block md-state" id="saveClientId">
+          ${icon('check')}保存
+        </button>
+      `}
+    </div>`;
+}
+
+/** カレンダー一覧を出して選ばせる */
+async function openCalendarPicker(root) {
+  let calendars = [];
+  try {
+    const token = await gcal.getAccessToken({ interactive: true });
+    calendars = await gcal.listCalendars(token);
+  } catch (err) {
+    snackbar(err.message, 'err');
+    return;
+  }
+
+  const paint = () => {
+    openSheet(`
+      <h2 class="md-dialog__headline" id="sheetTitle">カレンダーを選ぶ</h2>
+      <p class="md-dialog__body" style="margin-top:-8px">
+        ワークアウトの記録を書き込むカレンダーです。あとから変更できます。
+      </p>
+      <div class="md-list">
+        ${calendars.map((c) => `
+          <div class="md-list-item md-state" data-cal="${esc(c.id)}" role="button" tabindex="0">
+            <span class="md-list-item__leading" ${c.backgroundColor ? `style="background:${esc(c.backgroundColor)};color:#fff"` : ''}>
+              ${icon('calendar')}
+            </span>
+            <div class="md-list-item__content">
+              <div class="md-list-item__headline">${esc(c.summary)}</div>
+              <div class="md-list-item__supporting">${c.primary ? 'メインのカレンダー' : esc(c.id)}</div>
+            </div>
+            <span class="md-list-item__trailing">${icon('chevron')}</span>
+          </div>`).join('')}
+      </div>
+      <button class="md-button md-button--outlined md-button--block md-state" id="newCalendar" style="margin-top:8px">
+        ${icon('add')}「筋トレ」カレンダーを新しく作る
+      </button>`);
+
+    document.querySelector('.md-list').addEventListener('click', (ev) => {
+      const item = ev.target.closest('[data-cal]');
+      if (!item) return;
+      const picked = calendars.find((c) => c.id === item.dataset.cal);
+      saveCalendar(root, picked);
+    });
+
+    document.querySelector('#newCalendar').addEventListener('click', async () => {
+      try {
+        const token = await gcal.getAccessToken({ interactive: true });
+        const created = await gcal.createCalendar(token, '筋トレ');
+        saveCalendar(root, created);
+      } catch (err) { snackbar(err.message, 'err'); }
+    });
+  };
+  paint();
+}
+
+async function saveCalendar(root, calendar) {
+  if (!calendar) return;
+  try {
+    state.profile = await db.updateProfile(state.profile.id, {
+      calendar_id: calendar.id, calendar_summary: calendar.summary
+    });
+    closeSheet();
+    snackbar(`「${calendar.summary}」に書き込みます`, 'ok');
+    paint(root);
+  } catch (err) { snackbar(err.message, 'err'); }
 }
 
 const textField = (id, label, value) => `
@@ -223,6 +341,36 @@ function bind(root) {
       if (key === 'rest_minutes') rememberRestMinutes(value);
       if (key.startsWith('monthly_target')) state.dashboard = await db.dashboard(state.profile.id);
       snackbar('更新しました', 'ok');
+    } catch (err) { snackbar(err.message, 'err'); }
+  });
+
+  root.querySelector('#saveClientId')?.addEventListener('click', () => {
+    const clientId = root.querySelector('#gClientId').value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(clientId)) {
+      snackbar('クライアントIDの形式が正しくありません（…apps.googleusercontent.com）', 'err');
+      return;
+    }
+    setGoogleConfig({ clientId });
+    snackbar('保存しました。続けて連携してください', 'ok');
+    paint(root);
+  });
+
+  root.querySelector('#pickCalendar')?.addEventListener('click', () => openCalendarPicker(root));
+
+  root.querySelector('#unlinkCalendar')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      headline: 'Googleカレンダーの連携を解除しますか？',
+      body: 'これから先の記録はカレンダーに追加されなくなります。すでに作られた予定は残ります。',
+      confirmLabel: '解除する',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      state.profile = await db.updateProfile(state.profile.id,
+        { calendar_id: null, calendar_summary: null });
+      gcal.forgetToken();
+      snackbar('連携を解除しました', 'ok');
+      paint(root);
     } catch (err) { snackbar(err.message, 'err'); }
   });
 

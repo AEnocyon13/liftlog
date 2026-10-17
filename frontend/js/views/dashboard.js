@@ -1,7 +1,9 @@
 /** dashboard.js — 月間レポート */
-import { state } from '../state.js';
+import { state, canEdit } from '../state.js';
 import * as db from '../db.js';
-import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP, snackbar, emptyState } from '../ui.js';
+import * as gcal from '../googleCalendar.js';
+import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP,
+         snackbar, emptyState, confirmDialog } from '../ui.js';
 
 let viewMonth = null;
 
@@ -129,6 +131,24 @@ function paint(root, d) {
         </div>
       </div>` : ''}
 
+    ${(d.recentWorkouts || []).length ? `
+      <h2 class="md-section-header">${esc(d.monthLabel)}のワークアウト</h2>
+      <div class="md-list">
+        ${d.recentWorkouts.map((w) => `
+          <div class="md-list-item md-list-item--static" data-workout="${esc(w.id)}">
+            <span class="md-list-item__leading">${icon('calendar')}</span>
+            <div class="md-list-item__content">
+              <div class="md-list-item__headline">${fmtDateJP(w.date)}　${esc(w.parts.join(' / ') || '—')}</div>
+              <div class="md-list-item__supporting">
+                ${w.sets}セット · ${fmtVolume(w.volume)} · ${w.durationMin}分${w.calendarEventId ? ' · カレンダー登録済み' : ''}
+              </div>
+            </div>
+            ${canEdit() ? `
+              <button class="md-icon-button md-state" data-del="${esc(w.id)}" data-date="${esc(w.date)}"
+                      aria-label="この記録を削除" style="color:var(--md-sys-color-error)">${icon('delete')}</button>` : ''}
+          </div>`).join('')}
+      </div>` : ''}
+
     <h2 class="md-section-header">直近6ヶ月の推移</h2>
     <div class="md-card md-card--elevated">
       <div class="ll-bars">
@@ -147,6 +167,9 @@ function paint(root, d) {
   `;
 
   root.addEventListener('click', async (ev) => {
+    const del = ev.target.closest('[data-del]');
+    if (del) return deleteWorkout(root, d, del.dataset.del, del.dataset.date);
+
     const nav = ev.target.closest('[data-nav]');
     if (nav) {
       viewMonth = shiftMonth(d.month, Number(nav.dataset.nav));
@@ -162,6 +185,39 @@ function paint(root, d) {
       } catch (err) { snackbar(err.message, 'err'); }
     }
   });
+}
+
+/** 記録を削除する。カレンダーに予定を作っていれば、そちらも消す。 */
+async function deleteWorkout(root, d, id, date) {
+  const target = (d.recentWorkouts || []).find((w) => String(w.id) === String(id));
+  const linked = target?.calendarEventId && state.profile?.calendar_id;
+  const ok = await confirmDialog({
+    headline: `${fmtDateJP(date)} の記録を削除しますか？`,
+    body: 'この日のセットがすべて消えます。元に戻せません。'
+        + (linked ? 'Googleカレンダーの予定も一緒に削除します。' : ''),
+    confirmLabel: '削除する',
+    danger: true
+  });
+  if (!ok) return;
+
+  try {
+    if (linked) {
+      try {
+        await gcal.deleteEvent({
+          calendarId: state.profile.calendar_id, eventId: target.calendarEventId
+        });
+      } catch (err) {
+        snackbar('カレンダーの予定を消せませんでした。' + err.message, 'err');
+      }
+    }
+    await db.deleteWorkout(id);
+    const fresh = await db.dashboard(state.profile.id, d.month);
+    state.dashboard = fresh;
+    snackbar('記録を削除しました', 'ok');
+    paint(root, fresh);
+  } catch (err) {
+    snackbar(err.message, 'err');
+  }
 }
 
 const kv = (label, value) => `

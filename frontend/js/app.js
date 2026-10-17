@@ -5,6 +5,7 @@ import { currentUser } from './auth.js';
 import * as db from './db.js';
 import { state, getPeekTarget, setPeekTarget, canEdit, resetSession, loadDraft, adoptDraft } from './state.js';
 import { initOverlayEvents, snackbar, $ } from './ui.js';
+import { warmUpToken } from './googleCalendar.js';
 import { initTheme } from './theme.js';
 import { defineRoutes, startRouter, navigate, currentPath, routeRequiresUser } from './router.js';
 
@@ -39,6 +40,8 @@ export async function bootstrap() {
   await loadCatalog();
   if (!state.profile) return;
   state.dashboard = await db.dashboard(state.profile.id);
+  // カレンダー連携済みなら、終了時に待たされないようトークンを先に温めておく
+  if (canEdit() && state.profile.calendar_id) warmUpToken();
   if (canEdit()) {
     state.workout = await db.activeWorkout(state.profile.id);
     if (state.workout) adoptDraft(state.workout);

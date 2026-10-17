@@ -242,6 +242,13 @@ export async function finishWorkout(workout, entries, { memo, restMinutes, start
   return { savedSets: rows.length, totalVolume: Math.round(totalVolume * 10) / 10, totalSets };
 }
 
+/** 作成した Google カレンダーの予定IDを覚えておく */
+export async function setCalendarEvent(workoutId, eventId) {
+  const { error } = await sb().from('workouts')
+    .update({ calendar_event_id: eventId }).eq('id', workoutId);
+  throwIf(error, 'カレンダー連携の保存');
+}
+
 export async function deleteWorkout(workoutId) {
   const { error } = await sb().from('workouts').delete().eq('id', workoutId);
   throwIf(error, 'ワークアウトの削除');
@@ -265,8 +272,9 @@ export async function dashboard(userId, month) {
       .select('date, part, exercise, weight, reps, est_1rm, volume')
       .eq('user_id', userId).eq('is_warmup', false).gte('date', from).lte('date', to),
     client.from('workouts')
-      .select('id, date, duration_min, total_volume, total_sets')
-      .eq('user_id', userId).eq('status', 'finished').gte('date', sixAgo).lte('date', to),
+      .select('id, date, duration_min, total_volume, total_sets, memo, calendar_event_id')
+      .eq('user_id', userId).eq('status', 'finished').gte('date', sixAgo).lte('date', to)
+      .order('date', { ascending: false }),
     client.from('v_daily_volume')
       .select('date, volume, sets, parts')
       .eq('user_id', userId).gte('date', sixAgo).lte('date', to),
@@ -372,6 +380,26 @@ export async function dashboard(userId, month) {
     });
   }
 
+  // 最近のワークアウト（削除の導線に使う）。部位はその日のセットから拾う
+  const partsByDate = new Map();
+  sets.forEach((s2) => {
+    const set = partsByDate.get(s2.date) || new Set();
+    set.add(s2.part);
+    partsByDate.set(s2.date, set);
+  });
+  const recentWorkouts = monthWorkouts
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map((w) => ({
+      id: w.id, date: w.date,
+      durationMin: w.duration_min || 0,
+      volume: round1(Number(w.total_volume || 0)),
+      sets: w.total_sets || 0,
+      memo: w.memo || '',
+      calendarEventId: w.calendar_event_id || null,
+      parts: [...(partsByDate.get(w.date) || [])]
+    }));
+
   const lastDate = daily.map((d) => d.date).sort().pop() || null;
 
   return {
@@ -393,7 +421,7 @@ export async function dashboard(userId, month) {
       avgVolumePerSession: done > 0 ? round1(totalVolume / done) : 0,
       avgMinutesPerSession: done > 0 ? Math.round(totalMinutes / done) : 0
     },
-    byPart, calendar, prs, topLifts, trend,
+    byPart, calendar, prs, topLifts, trend, recentWorkouts,
     lastWorkoutDate: lastDate,
     restDays: lastDate ? Math.floor((dateOf(t) - dateOf(lastDate)) / 86400000) : null
   };

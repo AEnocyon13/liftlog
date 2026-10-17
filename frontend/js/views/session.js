@@ -5,6 +5,7 @@ import { startAutosave, stopAutosave, touch, flushNow, autosaveState } from '../
 import { esc, icon, snackbar, confirmDialog, fmtNum, fmtDuration, fmtVolume, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
 import { openExercisePicker } from './exercisePicker.js';
+import * as gcal from '../googleCalendar.js';
 import { navigate } from '../router.js';
 import { resetPicking } from './select.js';
 import { restTimerHtml, startTicking, stopTicking, handleRestClick } from '../restTimer.js';
@@ -306,6 +307,9 @@ function renumber(entry) {
 
 async function finish(root) {
   const draft = state.draft;
+  const workout = state.workout;            // state.workout は保存後に null にするので控える
+  const memo = draft.memo || '';
+  const startedAt = draft.startTime;
   const entries = draft.entries.map((e) => ({
     part: e.part,
     menu: e.menu,
@@ -330,10 +334,10 @@ async function finish(root) {
   await flushNow();
 
   try {
-    const res = await db.finishWorkout(state.workout, entries, {
-      memo: draft.memo || '',
+    const res = await db.finishWorkout(workout, entries, {
+      memo,
       restMinutes: draft.rest?.minutes,
-      startedAt: draft.startTime
+      startedAt
     });
     teardown();
     clearDraft();
@@ -342,8 +346,34 @@ async function finish(root) {
     state.dashboard = await db.dashboard(state.profile.id);
     snackbar(`${res.savedSets}セット / ${fmtVolume(res.totalVolume)} を記録しました`, 'ok');
     navigate('/dashboard');
+
+    // カレンダーへの書き込みは記録の保存とは切り離す。
+    // ここで失敗しても記録はすでに Supabase に入っている。
+    addToCalendar(workout, entries, { memo, startedAt });
   } catch (err) {
     snackbar(err.message, 'err');
+  }
+}
+
+/**
+ * ワークアウトをカレンダーに追加する。
+ * 記録の保存はすでに終わっているので、ここでの失敗は知らせるだけにとどめる。
+ */
+async function addToCalendar(workout, entries, { memo, startedAt }) {
+  const calendarId = state.profile?.calendar_id;
+  if (!workout || !calendarId || !gcal.isGoogleConfigured()) return;
+  try {
+    const eventId = await gcal.createEvent({
+      calendarId,
+      workout: { memo },
+      entries,
+      startedAt: startedAt || workout.started_at,
+      endedAt: new Date().toISOString()
+    });
+    await db.setCalendarEvent(workout.id, eventId);
+    snackbar('Googleカレンダーに追加しました', 'ok');
+  } catch (err) {
+    snackbar('記録は保存できましたが、カレンダーへの追加に失敗しました。' + err.message, 'err');
   }
 }
 
@@ -360,7 +390,16 @@ async function abort() {
   clearDraft();
   resetPicking();
   state.workout = null;
-  if (workout) { try { await db.deleteWorkout(workout.id); } catch { /* 既に無ければ無視 */ } }
+  if (workout) {
+    if (workout.calendar_event_id && state.profile?.calendar_id) {
+      try {
+        await gcal.deleteEvent({
+          calendarId: state.profile.calendar_id, eventId: workout.calendar_event_id
+        });
+      } catch { /* 予定が残っても記録の中止は進める */ }
+    }
+    try { await db.deleteWorkout(workout.id); } catch { /* 既に無ければ無視 */ }
+  }
   snackbar('ワークアウトを中止しました');
   navigate('/home');
 }

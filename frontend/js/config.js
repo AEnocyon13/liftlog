@@ -13,6 +13,32 @@ export const DEFAULT_SUPABASE = {
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkdmxjd2V3c3d3aW5xcWdhaGV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mzk5MTcsImV4cCI6MjEwNzExNTkxN30.Gj54RvELBgfsm-6BnXIlduB5k5wpLzSlJDQaKiT90Is'     // 例: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 };
 
+/**
+ * Google カレンダー連携に使う OAuth クライアントID。
+ * これも**公開してよい値**です（ブラウザに配る前提の識別子で、秘密鍵ではありません）。
+ * 作り方は docs/GOOGLE_CALENDAR.md。空のままなら連携機能は出ません。
+ */
+export const DEFAULT_GOOGLE = {
+  clientId: ''    // 例: '1234567890-abcdefg.apps.googleusercontent.com'
+};
+
+const LS_GOOGLE = 'liftlog.google';
+
+export function getGoogleConfig() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(LS_GOOGLE) || '{}'); } catch { /* noop */ }
+  return { clientId: (stored.clientId || DEFAULT_GOOGLE.clientId || '').trim() };
+}
+
+export function setGoogleConfig(patch) {
+  const next = { ...getGoogleConfig(), ...patch };
+  localStorage.setItem(LS_GOOGLE, JSON.stringify(next));
+  return next;
+}
+
+export const isGoogleConfigured = () =>
+  /\.apps\.googleusercontent\.com$/.test(getGoogleConfig().clientId);
+
 const LS_KEY = 'liftlog.supabase';
 
 /**
