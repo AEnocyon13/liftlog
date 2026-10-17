@@ -31,3 +31,7 @@ create policy exercises_delete on public.exercises for delete to authenticated
 drop policy if exists guides_write on public.exercise_guides;
 create policy guides_write on public.exercise_guides for all to authenticated
   using (true) with check (true);
+
+-- PostgREST のスキーマキャッシュを更新する。
+-- これを忘れると、列を足したのに「Could not find the ... column」と言われ続ける。
+notify pgrst, 'reload schema';

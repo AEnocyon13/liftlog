@@ -192,6 +192,7 @@ Table Editor の各テーブル右上 **⋯ → Export to CSV** で書き出せ�
 | 「Confirm email をオフに」と出る | 手順3の **Confirm email** がオンのままです |
 | 「新規登録が止められています」と出る | **Allow new users to sign up** がオフです |
 | `violates row-level security policy` | 覗き見モードのまま書き込もうとしています。PINを入れてログインしてください |
+| `Could not find the '○○' column` / `column ... does not exist` | `supabase/migrations/` の SQL が未実行です。番号順に実行してください |
 | ログイン画面に名前が出ない | `profiles` が空です。新規登録から始めてください |
 | 種目が0件 | `seed.sql` を流していません |
 | `relation "public.xxx" does not exist` | `schema.sql` を流していません |

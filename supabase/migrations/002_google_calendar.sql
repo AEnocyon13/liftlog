@@ -21,3 +21,7 @@ alter table public.workouts
 
 comment on column public.workouts.calendar_event_id is
   '作成した Google カレンダーの予定ID。記録を消すときに予定も消すために使う。';
+
+-- PostgREST のスキーマキャッシュを更新する。
+-- これを忘れると、列を足したのに「Could not find the ... column」と言われ続ける。
+notify pgrst, 'reload schema';

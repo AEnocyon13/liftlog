@@ -77,7 +77,14 @@ LiftLog で記録
 
 > **クライアントシークレットは使いません。** 控える必要も、アプリに貼る必要もありません。
 
-## 5. アプリに登録して連携する
+## 5. Supabase にカレンダー用の列を足す
+
+連携の前に、Supabase の SQL Editor で
+[`supabase/migrations/002_google_calendar.sql`](../supabase/migrations/002_google_calendar.sql)
+を1回実行してください。これを忘れると、カレンダーを選んだところで
+`Could not find the 'calendar_id' column of 'profiles'` と出て保存できません。
+
+## 6. アプリに登録して連携する
 
 1. アプリの **設定** → **Googleカレンダー**
 2. クライアントIDを貼って **保存**
@@ -111,4 +118,5 @@ LiftLog で記録
 | 「Google の認証が切れました」 | 1時間ほどで切れます。設定 → Googleカレンダーから連携し直してください |
 | 「カレンダーへの権限が足りません」 | 手順3のスコープ2つが入っているか確認し、連携し直してください |
 | 予定が作られない | 設定で連携済みか、クライアントIDが保存されているかを確認してください |
+| `Could not find the 'calendar_id' column of 'profiles'` | 手順5の SQL が未実行です。実行すれば直ります |
 | アクセスをブロックされた | テストユーザーに自分のGoogleアカウントが入っていない可能性があります |

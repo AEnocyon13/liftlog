@@ -51,6 +51,11 @@ export function throwIf(error, context) {
     [/duplicate key value.*display_name/i, 'その名前はすでに登録されています。別の表記にしてください。'],
     [/violates row-level security/i, '覗き見モードでは変更できません。PINを入力してログインしてください。'],
     [/Password should be at least/i, 'Supabase のパスワード最小文字数の設定が厳しすぎます。6文字に戻してください。'],
+    [/Could not find the '([^']+)' column of '([^']+)'|column [\w.]+ does not exist/i,
+      'Supabase に必要な列がありません。SQL Editor で supabase/migrations/ の中を'
+      + '番号順に実行してください（詳しくは docs/SUPABASE.md）。'],
+    [/relation "public\.(\w+)" does not exist|Could not find the table/i,
+      'Supabase に必要なテーブルがありません。SQL Editor で supabase/schema.sql を実行してください。'],
     [/Failed to fetch|NetworkError/i, '通信に失敗しました。電波と Supabase の稼働状況を確認してください。']
   ];
   const hit = map.find(([re]) => re.test(msg));
