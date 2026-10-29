@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LiftLog デザイン案 — ダーク × ネオン</title>
+<meta name="description" content="LiftLog の再デザイン案。ジム系ダーク＋ネオン、3D中心のプロトタイプ。">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="proto.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" } }
+</script>
+</head>
+<body>
+
+<!-- ======================================================= アイコン定義 == -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="lg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2ee6ff"/><stop offset="1" stop-color="#c8ff3d"/>
+    </linearGradient>
+
+    <!-- ロゴマーク：プレート（輪）＋積み上がる記録（3本の棒） -->
+    <symbol id="mark" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="19" fill="none" stroke="url(#lg)" stroke-width="3.6"
+              stroke-linecap="round" stroke-dasharray="104 15" transform="rotate(118 24 24)"/>
+      <g fill="currentColor">
+        <rect x="14.5" y="26"   width="5" height="8"  rx="2.1"/>
+        <rect x="21.5" y="21"   width="5" height="13" rx="2.1"/>
+        <rect x="28.5" y="15.5" width="5" height="18.5" rx="2.1"/>
+      </g>
+    </symbol>
+
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8a1 1 0 0 0 1.54.84l9.4-6.4a1 1 0 0 0 0-1.68l-9.4-6.4A1 1 0 0 0 8 5.6Z" fill="currentColor"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="13" width="4" height="8" rx="1.4"/><rect x="10" y="8" width="4" height="13" rx="1.4"/><rect x="17" y="3" width="4" height="18" rx="1.4"/></g></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H11a2 2 0 0 1 2 2v15a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 16.5Zm16 0A1.5 1.5 0 0 0 18.5 3H13a2 2 0 0 0-2 2v15a2 2 0 0 1 2-2h5.5a1.5 1.5 0 0 0 1.5-1.5Z" fill="currentColor"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm8.5-3.5c0-.5 0-1-.1-1.4l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.4-1.4L15.2 2h-4l-.4 2.6a7.6 7.6 0 0 0-2.4 1.4l-2.4-1-2 3.4 2 1.6a8.3 8.3 0 0 0 0 2.8l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.4 1.4l.4 2.8h4l.4-2.8a7.6 7.6 0 0 0 2.4-1.4l2.4 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.4Z" fill="currentColor"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.6 4.6L19 7.7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.8l2.4 1.6M9.5 2.5h5"/></g></symbol>
+  </defs>
+</svg>
+
+<!-- ================================================================ 導入 == -->
+<header class="lead">
+  <div class="wrap">
+    <p class="lead__eyebrow">LiftLog ／ デザイン案 01</p>
+    <h1>暗闇に<em>光る</em><br>重量計。</h1>
+    <p>ジムは暗い。画面は明るすぎないほうがいい。黒に近い下地の上で、いま必要な数字だけがネオンで光る——
+       そういう組み立てにしました。ロゴも、部位を選ぶ人体も、完了の演出も、全部コードで描いています
+       （画像ファイルはゼロ、合計でも数十KB）。</p>
+    <p>下の端末は<strong>全部そのまま触れます</strong>。人体はドラッグで回り、タップで部位を選べます。
+       「終了」を押すと完了演出が出ます。</p>
+  </div>
+</header>
+
+<!-- ================================================================ ロゴ == -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec__head"><span class="sec__n">01</span><h2>ロゴ</h2></div>
+    <p class="sec__note">プレート（重り）の輪と、積み上がっていく記録の棒。この2つだけで「持ち上げる」と「記録する」を表します。
+       輪は一周せずに少し開けてあり、まだ伸びしろがあることを示しています。16px まで潰しても棒の3本は読めます。</p>
+
+    <div class="logos">
+      <div class="logo-card">
+        <span class="wordmark" style="color:var(--lime)">
+          <svg width="34" height="34" aria-hidden="true"><use href="#mark"/></svg>
+          <span><span class="wordmark__lift">LIFT</span><span class="wordmark__log">LOG</span></span>
+        </span>
+        <span class="logo-card__cap">横組み／標準</span>
+      </div>
+
+      <div class="logo-card">
+        <span class="wordmark wordmark--stack" style="color:var(--lime)">
+          <svg width="48" height="48" aria-hidden="true"><use href="#mark"/></svg>
+          <span><span class="wordmark__lift">LIFT</span><span class="wordmark__log">LOG</span></span>
+        </span>
+        <span class="logo-card__cap">縦組み</span>
+      </div>
+
+      <div class="logo-card">
+        <div class="appicon"><svg width="60" height="60" style="color:var(--lime)" aria-hidden="true"><use href="#mark"/></svg></div>
+        <span class="logo-card__cap">アプリアイコン</span>
+      </div>
+
+      <div class="logo-card logo-card--light">
+        <span class="wordmark" style="color:#5c8f00">
+          <svg width="34" height="34" aria-hidden="true"><use href="#mark"/></svg>
+          <span><span class="wordmark__lift">LIFT</span><span class="wordmark__log">LOG</span></span>
+        </span>
+        <span class="logo-card__cap">明るい地の上</span>
+      </div>
+
+      <div class="logo-card">
+        <span style="color:var(--lime);display:flex;gap:18px;align-items:flex-end">
+          <svg width="16" height="16" aria-hidden="true"><use href="#mark"/></svg>
+          <svg width="24" height="24" aria-hidden="true"><use href="#mark"/></svg>
+          <svg width="32" height="32" aria-hidden="true"><use href="#mark"/></svg>
+        </span>
+        <span class="logo-card__cap">小さいとき 16 / 24 / 32px</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 色・文字 == -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec__head"><span class="sec__n">02</span><h2>色と文字</h2></div>
+    <p class="sec__note">色には役割を1つずつ割り当てています。ライムは「いま・達成」、シアンは「過去・情報」、
+       マゼンタは「自己ベスト」、アンバーは「休憩」。これを守ると、画面を見た瞬間に意味が読めます。</p>
+
+    <div class="swatches">
+      <div class="sw"><div class="sw__chip" style="background:#06070a"></div><div class="sw__meta"><div class="sw__name">下地</div><div class="sw__hex">#06070A</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#11141b"></div><div class="sw__meta"><div class="sw__name">カード</div><div class="sw__hex">#11141B</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#c8ff3d;box-shadow:inset 0 0 40px rgb(200 255 61 / .9)"></div><div class="sw__meta"><div class="sw__name">ライム／いま・達成</div><div class="sw__hex">#C8FF3D</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#2ee6ff"></div><div class="sw__meta"><div class="sw__name">シアン／過去・情報</div><div class="sw__hex">#2EE6FF</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#ff2e92"></div><div class="sw__meta"><div class="sw__name">マゼンタ／自己ベスト</div><div class="sw__hex">#FF2E92</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#ffb02e"></div><div class="sw__meta"><div class="sw__name">アンバー／休憩</div><div class="sw__hex">#FFB02E</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#e9eef7"></div><div class="sw__meta"><div class="sw__name">文字</div><div class="sw__hex">#E9EEF7</div></div></div>
+      <div class="sw"><div class="sw__chip" style="background:#9aa4b8"></div><div class="sw__meta"><div class="sw__name">副文字</div><div class="sw__hex">#9AA4B8</div></div></div>
+    </div>
+
+    <div style="margin-top:34px">
+      <div class="type-row">
+        <span class="type-row__cap">数字・見出し ／ SAIRA CONDENSED 700</span>
+        <span class="num" style="font-size:52px;font-weight:700;line-height:1.05">82.5kg × 10　4,238kg　00:42:18</span>
+      </div>
+      <div class="type-row">
+        <span class="type-row__cap">本文 ／ NOTO SANS JP 400・500</span>
+        <span style="font-size:17px">前回より 2.5kg 増えています。同じ回数で挙げられたら次も上げましょう。</span>
+      </div>
+      <div class="type-row">
+        <span class="type-row__cap">ラベル ／ SAIRA CONDENSED 600・字間 .24em</span>
+        <span style="font-family:'Saira Condensed',sans-serif;font-size:13px;letter-spacing:.24em;color:var(--text-3)">THIS MONTH ／ TOTAL VOLUME ／ REST</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 画面 == -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec__head"><span class="sec__n">03</span><h2>画面</h2></div>
+    <p class="sec__note">横にスクロールします。どれも動いていて、触れます。</p>
+  </div>
+
+  <div class="wrap">
+  <div class="phones">
+
+    <!-- ------------------------------------------------------- ホーム -- -->
+    <div class="device">
+      <div class="phone"><div class="scr">
+        <canvas class="scr__bg" data-scene="hero"></canvas>
+        <div class="scr__scrim"></div>
+        <header class="appbar">
+          <span class="brand" style="color:var(--lime)">
+            <svg width="24" height="24" aria-hidden="true"><use href="#mark"/></svg>
+            <span><span class="wordmark__lift">LIFT</span><span class="wordmark__log">LOG</span></span>
+          </span>
+          <button class="avatar">OL</button>
+        </header>
+        <div class="scr__body">
+          <p class="eyebrow">10月29日 (木)</p>
+          <h1 class="hero-h">今日は<br><em>押す日</em>。</h1>
+          <p class="hero-sub">前回の胸トレから 4日空いています</p>
+
+          <button class="btn btn--neon btn--xl">
+            <svg width="20" height="20" aria-hidden="true"><use href="#i-play"/></svg>
+            ワークアウト開始
+          </button>
+
+          <div class="tiles">
+            <div class="tile tile--lime"><span class="tile__v num">7<small>/12</small></span><span class="tile__k">今月</span></div>
+            <div class="tile tile--cyan"><span class="tile__v num">23.8<small>t</small></span><span class="tile__k">ボリューム</span></div>
+            <div class="tile"><span class="tile__v num">4<small>日</small></span><span class="tile__k">最終から</span></div>
+          </div>
+
+          <h2 class="sect">直近の記録</h2>
+          <ul class="rows">
+            <li class="row row--lime">
+              <span class="row__bar"></span>
+              <span class="row__main"><span class="row__t">10/25(土)　胸 / 背中</span><span class="row__s">7セット · 72分</span></span>
+              <span class="row__v num">3,383<small style="font-size:12px;color:var(--text-3)">kg</small></span>
+            </li>
+            <li class="row">
+              <span class="row__bar"></span>
+              <span class="row__main"><span class="row__t">10/22(水)　脚</span><span class="row__s">9セット · 64分</span></span>
+              <span class="row__v num">5,120<small style="font-size:12px;color:var(--text-3)">kg</small></span>
+            </li>
+            <li class="row">
+              <span class="row__bar"></span>
+              <span class="row__main"><span class="row__t">10/19(日)　肩 / 腕</span><span class="row__s">8セット · 55分</span></span>
+              <span class="row__v num">2,640<small style="font-size:12px;color:var(--text-3)">kg</small></span>
+            </li>
+          </ul>
+        </div>
+        <nav class="navbar">
+          <button class="navitem is-on"><svg aria-hidden="true"><use href="#i-play"/></svg>ワークアウト</button>
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-chart"/></svg>レポート</button>
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-book"/></svg>種目解説</button>
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-gear"/></svg>設定</button>
+        </nav>
+      </div></div>
+      <p class="device__cap"><b>ホーム</b>　背景のバーベルは指に少し反応します</p>
+    </div>
+
+    <!-- --------------------------------------------------- 部位選択 -- -->
+    <div class="device">
+      <div class="phone"><div class="scr">
+        <header class="appbar">
+          <span class="brand"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg>
+            <span class="appbar__title">部位を選ぶ</span></span>
+          <button class="avatar">OL</button>
+        </header>
+        <div class="pick">
+          <div class="pick__stage">
+            <canvas data-scene="body"></canvas>
+            <p class="pick__hint">ドラッグで回す ／ タップで選ぶ</p>
+          </div>
+          <div class="chips" id="partChips"></div>
+          <div class="pick__sheet">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:13px;color:var(--text-3)">選択中</span>
+              <span id="pickSummary" class="num" style="font-size:18px;font-weight:700;color:var(--lime)">胸</span>
+            </div>
+            <ul class="rows" id="pickMenus"></ul>
+            <button class="btn btn--neon btn--xl" style="height:50px">この内容で始める</button>
+          </div>
+        </div>
+      </div></div>
+      <p class="device__cap"><b>部位選択</b>　人体を回して、鍛える部位をタップ</p>
+    </div>
+
+    <!-- ------------------------------------------------ ワークアウト中 -- -->
+    <div class="device">
+      <div class="phone"><div class="scr">
+        <canvas class="scr__fx" data-scene="burst"></canvas>
+        <header class="appbar">
+          <span class="appbar__title" style="color:var(--lime)">胸 / 背中</span>
+          <button class="avatar">OL</button>
+        </header>
+        <div class="scr__body">
+          <div class="clock">
+            <div class="clock__v num" id="elapsed">00:42:18</div>
+            <div class="clock__k">経過時間</div>
+          </div>
+
+          <div class="rest">
+            <div class="rest__ring">
+              <svg width="56" height="56">
+                <circle cx="28" cy="28" r="24" fill="none" stroke="#1f2531" stroke-width="5"/>
+                <circle cx="28" cy="28" r="24" fill="none" stroke="#ffb02e" stroke-width="5"
+                        stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="44"
+                        id="restRing" style="filter:drop-shadow(0 0 6px rgb(255 176 46 / .8))"/>
+              </svg>
+              <span class="rest__ring-v num" id="restV">1:12</span>
+            </div>
+            <div class="rest__main">
+              <div class="rest__t">休憩中</div>
+              <div class="rest__s">2分に設定 ／ 前回と同じ</div>
+            </div>
+            <button class="btn btn--ghost btn--sm">+30秒</button>
+          </div>
+
+          <div class="exercise">
+            <div class="exercise__head">
+              <span class="exercise__name">ベンチプレス</span>
+              <span class="exercise__tag">+2.5kg</span>
+            </div>
+            <p class="exercise__prev">前回 10/25 ： 80kg × 10 / 9 / 8</p>
+
+            <div class="setrow setrow--warm setrow--done">
+              <span class="setrow__no">W</span>
+              <span class="setrow__v num">40<small>kg</small></span>
+              <span class="setrow__v num">12<small>回</small></span>
+              <span class="setrow__ok"><svg width="17" height="17" aria-hidden="true"><use href="#i-check"/></svg></span>
+            </div>
+            <div class="setrow setrow--done">
+              <span class="setrow__no">1</span>
+              <span class="setrow__v num">82.5<small>kg</small></span>
+              <span class="setrow__v num">10<small>回</small></span>
+              <span class="setrow__ok"><svg width="17" height="17" aria-hidden="true"><use href="#i-check"/></svg></span>
+            </div>
+            <div class="setrow setrow--done">
+              <span class="setrow__no">2</span>
+              <span class="setrow__v num">82.5<small>kg</small></span>
+              <span class="setrow__v num">9<small>回</small></span>
+              <span class="setrow__ok"><svg width="17" height="17" aria-hidden="true"><use href="#i-check"/></svg></span>
+            </div>
+            <div class="setrow setrow--now">
+              <span class="setrow__no" style="color:var(--lime)">3</span>
+              <span class="stepper" data-step="w"><button data-d="-1">−</button><span class="stepper__v">82.5<small>kg</small></span><button data-d="1">＋</button></span>
+              <span class="stepper" data-step="r"><button data-d="-1">−</button><span class="stepper__v">8<small>回</small></span><button data-d="1">＋</button></span>
+              <span></span>
+            </div>
+          </div>
+
+          <div class="exercise" style="opacity:.55">
+            <div class="exercise__head"><span class="exercise__name" style="font-size:15px">ラットプルダウン</span></div>
+            <p class="exercise__prev" style="margin:0">このあと 3セット</p>
+          </div>
+        </div>
+        <div class="sticky-actions">
+          <button class="btn btn--neon">セットを記録</button>
+          <button class="btn btn--ghost btn--danger" id="finishBtn" style="padding:0 20px">終了</button>
+        </div>
+      </div></div>
+      <p class="device__cap"><b>ワークアウト中</b>　<span style="color:var(--magenta)">終了</span>を押すと完了演出が出ます</p>
+    </div>
+
+    <!-- ------------------------------------------------------ レポート -- -->
+    <div class="device">
+      <div class="phone"><div class="scr">
+        <header class="appbar">
+          <span class="appbar__title">2026年10月</span>
+          <button class="avatar">OL</button>
+        </header>
+        <div class="scr__body">
+          <div class="ringwrap">
+            <div class="ring">
+              <svg width="112" height="112">
+                <circle cx="56" cy="56" r="48" fill="none" stroke="#1f2531" stroke-width="9"/>
+                <circle cx="56" cy="56" r="48" fill="none" stroke="#c8ff3d" stroke-width="9"
+                        stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="125"
+                        style="filter:drop-shadow(0 0 9px rgb(200 255 61 / .85))"/>
+              </svg>
+              <span class="ring__v"><span class="ring__pct num">58<small style="font-size:17px">%</small></span><span class="ring__sub">7 / 12 回</span></span>
+            </div>
+            <div class="ringwrap__facts">
+              <div class="fact"><span class="fact__k">総ボリューム</span><span class="fact__v num" style="color:var(--cyan)">23.8t</span></div>
+              <div class="fact"><span class="fact__k">総セット</span><span class="fact__v num">64</span></div>
+              <div class="fact"><span class="fact__k">総時間</span><span class="fact__v num">7時間12分</span></div>
+              <div class="fact"><span class="fact__k">自己ベスト更新</span><span class="fact__v num" style="color:var(--magenta)">3種目</span></div>
+            </div>
+          </div>
+
+          <h2 class="sect">直近6ヶ月のボリューム</h2>
+          <div class="chart3d">
+            <canvas data-scene="bars"></canvas>
+            <div class="chart3d__axis" id="barAxis"></div>
+          </div>
+
+          <h2 class="sect">部位別</h2>
+          <div class="bars">
+            <div class="barline"><span>胸</span><span class="barline__track"><i class="barline__fill" style="width:31%;background:var(--lime);box-shadow:0 0 12px -2px var(--lime)"></i></span><span class="barline__v">7.4t</span></div>
+            <div class="barline"><span>脚</span><span class="barline__track"><i class="barline__fill" style="width:27%;background:var(--cyan)"></i></span><span class="barline__v">6.4t</span></div>
+            <div class="barline"><span>背中</span><span class="barline__track"><i class="barline__fill" style="width:22%;background:var(--cyan)"></i></span><span class="barline__v">5.2t</span></div>
+            <div class="barline"><span>肩</span><span class="barline__track"><i class="barline__fill" style="width:12%;background:var(--cyan);opacity:.7"></i></span><span class="barline__v">2.9t</span></div>
+            <div class="barline"><span>腕</span><span class="barline__track"><i class="barline__fill" style="width:8%;background:var(--cyan);opacity:.55"></i></span><span class="barline__v">1.9t</span></div>
+          </div>
+
+          <h2 class="sect">トレーニング日</h2>
+          <div class="heat" id="heat"></div>
+        </div>
+        <nav class="navbar">
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-play"/></svg>ワークアウト</button>
+          <button class="navitem is-on"><svg aria-hidden="true"><use href="#i-chart"/></svg>レポート</button>
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-book"/></svg>種目解説</button>
+          <button class="navitem"><svg aria-hidden="true"><use href="#i-gear"/></svg>設定</button>
+        </nav>
+      </div></div>
+      <p class="device__cap"><b>レポート</b>　立体の棒はゆっくり振れて、奥行きが出ます</p>
+    </div>
+
+  </div>
+  </div>
+</section>
+
+<!-- ============================================================= 考え方 == -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec__head"><span class="sec__n">04</span><h2>3Dをどう使ったか</h2></div>
+    <div class="notes">
+      <div class="note">
+        <h3>背景は「置物」にする</h3>
+        <p>ホームのバーベルは触らなくていい飾りです。指の動きに少しだけ反応しますが、操作とは無関係。
+           画面が映っていないあいだは描画を止めるので、電池はほとんど減りません。</p>
+      </div>
+      <div class="note note--cyan">
+        <h3>人体は「道具」にする</h3>
+        <p>部位選択だけは3Dに意味があります。胸と背中、肩と腕の違いは、言葉より形で見せたほうが早い。
+           モデルファイルは読み込まず、球と箱と円柱だけで組んでいるので 0KB です。</p>
+      </div>
+      <div class="note note--mag">
+        <h3>演出は一瞬で終わらせる</h3>
+        <p>完了演出は3秒で消えます。毎回見るものを長くすると、3回目から邪魔になるからです。
+           プレートが弾けて衝撃波が広がる——それだけ。</p>
+      </div>
+      <div class="note">
+        <h3>重さの目安</h3>
+        <p>Three.js が約170KB（gzip後・CDNから1回だけ）、こちらのコードは全部で約45KB。
+           画像ファイルは1枚も使っていないので、2回目以降はほぼ瞬時に開きます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap">LiftLog デザイン案 01 ／ このページは本体のアプリには影響しません</div></footer>
+
+<script type="module" src="proto.js"></script>
+</body>
+</html>
