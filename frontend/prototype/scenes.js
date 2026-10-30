@@ -206,103 +206,319 @@ export function mountHero(canvas) {
 
 export const BODY_PARTS = ['肩', '胸', '背中', '腕', '腹', '脚'];
 
+/**
+ * 断面（輪切り）を数枚重ねて、ひとつながりの滑らかな面を作る。
+ *
+ * 筋肉は箱でも球でもない。「どこがどれだけ膨らんでいるか」を
+ * 断面の大きさで指定できるこの方式なら、大胸筋の扇形も、
+ * 上腕二頭筋の山も、ふくらはぎの膨らみも、そのままの形で作れる。
+ *
+ * sections: [{ p:[x,y,z], rx, ry }]
+ *   p  … その断面の中心
+ *   rx … 進行方向に対して横の半径
+ *   ry … 進行方向に対して奥行きの半径
+ * 両端は自動で塞ぐ。
+ */
+function loft(sections, { radial = 24, shape = 2 } = {}) {
+  // shape=2 で楕円。大きくするほど角が立ち、筋肉が「面と稜線」を持つ。
+  // 解剖図の筋肉が風船に見えないのは、断面が丸ではなく角を持つから。
+  const e = 2 / shape;
+  const sup = (v) => Math.sign(v) * Math.pow(Math.abs(v), e);
+  const pts = sections.map((s) => new THREE.Vector3(...s.p));
+  const pos = [], idx = [];
+  const t = new THREE.Vector3(), n = new THREE.Vector3(), b = new THREE.Vector3();
+  const UPZ = new THREE.Vector3(0, 0, 1), UPY = new THREE.Vector3(0, 1, 0);
+
+  sections.forEach((s, i) => {
+    const prev = pts[Math.max(0, i - 1)];
+    const next = pts[Math.min(pts.length - 1, i + 1)];
+    t.subVectors(next, prev);
+    if (t.lengthSq() < 1e-9) t.set(0, 1, 0);
+    t.normalize();
+    // 接線と平行にならない参照軸を選ぶ（平行だと断面の向きが定まらない）
+    const ref = Math.abs(t.z) > .9 ? UPY : UPZ;
+    n.crossVectors(ref, t).normalize();
+    b.crossVectors(t, n).normalize();
+
+    for (let j = 0; j < radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const c = sup(Math.cos(a)), d = sup(Math.sin(a));
+      pos.push(
+        pts[i].x + n.x * c * s.rx + b.x * d * s.ry,
+        pts[i].y + n.y * c * s.rx + b.y * d * s.ry,
+        pts[i].z + n.z * c * s.rx + b.z * d * s.ry
+      );
+    }
+  });
+
+  for (let i = 0; i < sections.length - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const p0 = i * radial + j;
+      const p1 = i * radial + (j + 1) % radial;
+      idx.push(p0, p0 + radial, p1, p1, p0 + radial, p1 + radial);
+    }
+  }
+
+  const head = pos.length / 3;
+  pos.push(pts[0].x, pts[0].y, pts[0].z);
+  for (let j = 0; j < radial; j++) idx.push(head, (j + 1) % radial, j);
+
+  const tail = pos.length / 3;
+  const last = pts[pts.length - 1];
+  pos.push(last.x, last.y, last.z);
+  const off = (sections.length - 1) * radial;
+  for (let j = 0; j < radial; j++) idx.push(tail, off + j, off + (j + 1) % radial);
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** 丸い膨らみ（腹直筋の一枚、臀筋、膝など）。潰した球で作る */
+const blob = (() => {
+  const g = new THREE.SphereGeometry(1, 20, 14);
+  return () => g;
+})();
+
+/* --- 体の設計図 ---------------------------------------------------------
+   身長を 7.4 とし、床が y=0。x は体の左右（+が体の左側）、z は前が+。
+   比率は実際のトップビルダーのもの（肩幅は身長の約0.30）。
+   ---------------------------------------------------------------------- */
+
+/** 左右対称な筋肉。+x 側だけ書いて、反対側は鏡像で作る */
+const SIDE_MUSCLES = [
+  { part: '肩', shape: 2.1, sections: [        // 三角筋：肩関節を覆うお椀。外端が肩幅を決める
+    { p: [.66, 6.12,  .08], rx: .19, ry: .21 },
+    { p: [.80, 5.96,  .04], rx: .29, ry: .30 },
+    { p: [.86, 5.72,  .00], rx: .29, ry: .30 },
+    { p: [.84, 5.46, -.04], rx: .20, ry: .21 }
+  ]},
+
+  { part: '胸', shape: 2.4, sections: [        // 大胸筋：胸骨から上腕へ。板ではなく、下縁の立った扇
+    { p: [.13, 5.42, .38], rx: .26, ry: .05 },
+    { p: [.30, 5.46, .42], rx: .29, ry: .09 },
+    { p: [.47, 5.50, .41], rx: .27, ry: .09 },
+    { p: [.62, 5.58, .33], rx: .21, ry: .07 },
+    { p: [.72, 5.70, .18], rx: .11, ry: .05 }
+  ]},
+
+  { part: '背中', shape: 2.7, sections: [      // 広背筋：腰から脇へ。ここがV字の広がりを作る
+    { p: [.40, 4.32, -.14], rx: .18, ry: .13 },
+    { p: [.56, 4.84, -.18], rx: .24, ry: .18 },
+    { p: [.70, 5.28, -.18], rx: .28, ry: .23 },
+    { p: [.78, 5.62, -.14], rx: .24, ry: .20 },
+    { p: [.82, 5.88, -.06], rx: .15, ry: .12 }
+  ]},
+
+  { part: '腕', shape: 2.05, sections: [        // 上腕二頭筋
+    { p: [.72, 5.56,  .12], rx: .17, ry: .17 },
+    { p: [.82, 5.16,  .15], rx: .24, ry: .23 },
+    { p: [.89, 4.86,  .12], rx: .22, ry: .21 },
+    { p: [.95, 4.60,  .04], rx: .12, ry: .11 }
+  ]},
+  { part: '腕', shape: 2.1, sections: [        // 上腕三頭筋（二頭より一回り大きい）
+    { p: [.76, 5.64, -.10], rx: .18, ry: .17 },
+    { p: [.85, 5.20, -.15], rx: .26, ry: .24 },
+    { p: [.92, 4.86, -.13], rx: .24, ry: .22 },
+    { p: [.97, 4.56, -.04], rx: .13, ry: .11 }
+  ]},
+  { part: '腕', shape: 2.0, sections: [        // 前腕：肘のすぐ下がもっとも太い
+    { p: [.97, 4.50, .02], rx: .19, ry: .19 },
+    { p: [1.02, 4.14, .05], rx: .25, ry: .23 },
+    { p: [1.06, 3.78, .02], rx: .18, ry: .17 },
+    { p: [1.09, 3.42, .00], rx: .12, ry: .11 }
+  ]},
+
+  { part: '脚', shape: 2.15, sections: [        // 大腿四頭筋：膝の上で一度細り、内側広筋で張り出す
+    { p: [.31, 3.76, .06], rx: .32, ry: .33 },
+    { p: [.33, 3.20, .09], rx: .37, ry: .38 },
+    { p: [.35, 2.70, .09], rx: .35, ry: .36 },
+    { p: [.37, 2.28, .05], rx: .28, ry: .28 },
+    { p: [.38, 2.06, .02], rx: .21, ry: .21 }
+  ]},
+  { part: '脚', shape: 2.1, sections: [        // ハムストリングス
+    { p: [.33, 3.68, -.16], rx: .27, ry: .25 },
+    { p: [.35, 3.20, -.19], rx: .30, ry: .28 },
+    { p: [.37, 2.70, -.18], rx: .28, ry: .26 },
+    { p: [.38, 2.26, -.11], rx: .20, ry: .19 }
+  ]},
+  { part: '脚', shape: 2.05, sections: [        // 腓腹筋
+    { p: [.36, 2.02,  .00], rx: .22, ry: .21 },
+    { p: [.35, 1.78, -.04], rx: .30, ry: .28 },
+    { p: [.34, 1.48, -.05], rx: .27, ry: .26 },
+    { p: [.34, 1.10, -.02], rx: .16, ry: .16 },
+    { p: [.34,  .64,  .00], rx: .11, ry: .11 }
+  ]}
+];
+
+/** 体の中央にある、左右をまたぐ筋肉 */
+const CENTER_MUSCLES = [
+  { part: '背中', shape: 2.4, sections: [      // 僧帽筋：首から肩へ落ちる傾斜。ここが薄いと首が長く見える
+    { p: [-.86, 5.90, -.02], rx: .17, ry: .15 },
+    { p: [-.36, 6.26, -.12], rx: .27, ry: .20 },
+    { p: [ .00, 6.36, -.14], rx: .30, ry: .23 },
+    { p: [ .36, 6.26, -.12], rx: .27, ry: .20 },
+    { p: [ .86, 5.90, -.02], rx: .17, ry: .15 }
+  ]},
+  { part: '背中', shape: 2.4, sections: [      // 脊柱起立筋と中背部の厚み
+    { p: [0, 4.36, -.28], rx: .26, ry: .07 },
+    { p: [0, 4.88, -.34], rx: .34, ry: .10 },
+    { p: [0, 5.32, -.40], rx: .40, ry: .12 },
+    { p: [0, 5.74, -.38], rx: .36, ry: .11 }
+  ]}
+];
+
+/** 潰した球で作る膨らみ。[部位, 中心, 大きさ] */
+const SIDE_BLOBS = [
+  ['腹', [.145, 5.06, .35], [.140, .115, .055]],  // 腹直筋。縦に4段
+  ['腹', [.145, 4.82, .35], [.145, .115, .055]],
+  ['腹', [.145, 4.58, .33], [.140, .110, .055]],
+  ['腹', [.145, 4.35, .30], [.125, .100, .050]],
+  ['腹', [.44,  4.70, .13], [.080, .300, .15]],   // 外腹斜筋（脇腹）
+  ['脚', [.25,  2.34, .14], [.140, .210, .12]],   // 内側広筋（膝上の瘤）
+  ['脚', [.30,  3.62, -.32], [.270, .280, .21]],  // 大臀筋
+  ['腕', [.73,  5.86, .18], [.110, .110, .10]]    // 三角筋前部と二頭の合わせ目
+];
+
+/** 選択の対象にしない土台。[中心, 大きさ] */
+const NEUTRAL_BLOBS = [
+  [[.37, 2.06,  .04], [.19, .15, .18]],   // 膝
+  [[1.11, 3.18, .01], [.13, .22, .10]],   // 手
+  [[.34,  .18,  .13], [.15, .11, .31]]    // 足
+];
+
+const NEUTRAL_LOFTS = [
+  [                                        // 頭：顎と頭蓋を持たせる（球だと卵に見える）
+    { p: [0, 6.48,  .00], rx: .22, ry: .24 },
+    { p: [0, 6.64,  .02], rx: .30, ry: .34 },
+    { p: [0, 6.86,  .02], rx: .36, ry: .42 },
+    { p: [0, 7.10,  .00], rx: .38, ry: .44 },
+    { p: [0, 7.32, -.02], rx: .30, ry: .34 },
+    { p: [0, 7.44, -.03], rx: .14, ry: .16 }
+  ],
+  [                                        // 胴体の芯（骨盤から鎖骨まで）
+    { p: [0, 3.50, 0], rx: .54, ry: .36 },
+    { p: [0, 3.86, 0], rx: .64, ry: .40 },
+    { p: [0, 4.20, 0], rx: .58, ry: .36 },
+    { p: [0, 4.52, 0], rx: .49, ry: .31 },
+    { p: [0, 4.90, 0], rx: .55, ry: .36 },
+    { p: [0, 5.30, 0], rx: .65, ry: .42 },
+    { p: [0, 5.70, 0], rx: .72, ry: .46 },
+    { p: [0, 6.02, 0], rx: .62, ry: .40 },
+    { p: [0, 6.24, 0], rx: .44, ry: .32 }
+  ],
+  [                                        // 首
+    { p: [0, 5.96, -.02], rx: .35, ry: .34 },
+    { p: [0, 6.28, -.02], rx: .31, ry: .31 },
+    { p: [0, 6.58, -.01], rx: .28, ry: .28 }
+  ],
+  [                                        // 脛
+    { p: [.35, 1.98, .06], rx: .21, ry: .20 },
+    { p: [.34, 1.42, .06], rx: .17, ry: .17 },
+    { p: [.34,  .84, .03], rx: .13, ry: .14 },
+    { p: [.34,  .40, .01], rx: .10, ry: .11 }
+  ]
+];
+
 export function mountBody(canvas, onChange) {
   const renderer = makeRenderer(canvas, { alpha: true });
   const scene = new THREE.Scene();
 
-  const camera = new THREE.PerspectiveCamera(34, 1, .1, 60);
-  camera.position.set(0, .92, 8.6);
+  const camera = new THREE.PerspectiveCamera(32, 1, .1, 60);
+  camera.position.set(0, .1, 14.2);
 
-  scene.add(new THREE.AmbientLight(0x4a5a7a, .6));
-  const l1 = new THREE.PointLight(LIME, 42, 26, 2); l1.position.set(-4, 3.4, 5);  scene.add(l1);
-  const l2 = new THREE.PointLight(CYAN, 34, 26, 2); l2.position.set( 4.4, .4, 3); scene.add(l2);
-  const l3 = new THREE.DirectionalLight(0xcfe0ff, .9); l3.position.set(0, 5, 6);  scene.add(l3);
-  const l4 = new THREE.DirectionalLight(0x7fa0d0, .5); l4.position.set(0, -3, 4);  scene.add(l4);
+  /* 筋肉の起伏は、正面からの強い光より「斜めの主光＋縁の光」で出る。
+     上から下へ色が変わる半球光を足すと、丸みが素直に見える。 */
+  scene.add(new THREE.HemisphereLight(0x7f95c6, 0x10151f, .6));
+  const key  = new THREE.DirectionalLight(0xffffff, 2.1); key.position.set(-3.2, 5, 6);  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x6b80b0, .35); fill.position.set(3.5, 1, 5);  scene.add(fill);
+  const limeL = new THREE.PointLight(LIME, 55, 32, 2);    limeL.position.set(-4.6, 2.6, 3.5); scene.add(limeL);
+  const rimR = new THREE.PointLight(CYAN, 95, 32, 2);     rimR.position.set(5.0, 1.2, -1.8); scene.add(rimR);
+  const rimL = new THREE.PointLight(0xa9b6ff, 60, 32, 2); rimL.position.set(-5.0, .6, -2.4); scene.add(rimL);
 
   const figure = new THREE.Group();
-  figure.position.y = -.2;
+  figure.position.y = -3.72;      // 体の中心を原点に合わせる
   scene.add(figure);
-
-  /* 部位ごとに材質を分ける。光らせるのは「その部位だけ」にしたいので */
-  const matFor = () => new THREE.MeshStandardMaterial({
-    color: 0x2b3648, metalness: .5, roughness: .38,
-    emissive: new THREE.Color(0x7ad016), emissiveIntensity: 0
-  });
-  const neutral = new THREE.MeshStandardMaterial({ color: 0x1d2635, metalness: .45, roughness: .5 });
 
   const groups = {};
   BODY_PARTS.forEach((p) => {
     const g = new THREE.Group();
-    g.userData = { part: p, mat: matFor(), level: 0, selected: false };
+    g.userData = {
+      part: p, level: 0,
+      mat: new THREE.MeshPhysicalMaterial({
+        color: 0x343f57, metalness: .08, roughness: .5,
+        clearcoat: .16, clearcoatRoughness: .6,      // うっすら汗ばんだ程度
+        emissive: new THREE.Color(0x7ad016), emissiveIntensity: 0
+      })
+    };
     figure.add(g);
     groups[p] = g;
   });
 
-  const add = (part, geo, [x, y, z], rot = [0, 0, 0]) => {
-    const g = groups[part];
-    const m = new THREE.Mesh(geo, g.userData.mat);
-    m.position.set(x, y, z);
-    m.rotation.set(...rot);
-    m.userData.part = part;
-    g.add(m);
-    return m;
-  };
-  const addNeutral = (geo, [x, y, z], rot = [0, 0, 0]) => {
-    const m = new THREE.Mesh(geo, neutral);
-    m.position.set(x, y, z);
-    m.rotation.set(...rot);
-    figure.add(m);
-    return m;
-  };
-
-  /* --- 体を組む（単純な形の組み合わせ。低ポリゴンでネオンに映える） ----- */
-  // 頭と首
-  addNeutral(new THREE.SphereGeometry(.34, 24, 18), [0, 3.12, 0]);
-  addNeutral(new THREE.CapsuleGeometry(.15, .18, 4, 14), [0, 2.74, 0]);
-
-  // 胴体の芯（選択対象にしない）
-  addNeutral(new THREE.BoxGeometry(.98, 1.5, .52), [0, 1.78, 0]);
-  addNeutral(new THREE.BoxGeometry(1.0, .42, .58), [0, .9, 0]);           // 骨盤
-
-  // 肩
-  [-1, 1].forEach((s) => add('肩', new THREE.SphereGeometry(.35, 20, 16), [.66 * s, 2.42, 0]));
-
-  // 胸（胴体の前面に2枚）
-  [-1, 1].forEach((s) =>
-    add('胸', new THREE.BoxGeometry(.4, .5, .22), [.27 * s, 2.1, .33], [0, 0, .1 * s]));
-
-  // 背中（背面に広がる逆三角）
-  add('背中', new THREE.BoxGeometry(1.06, .78, .2),  [0, 2.12, -.31]);
-  [-1, 1].forEach((s) => add('背中', new THREE.BoxGeometry(.3, .62, .18), [.6 * s, 1.84, -.26], [0, 0, .42 * s]));
-
-  // 腹
-  add('腹', new THREE.BoxGeometry(.56, .64, .2), [0, 1.42, .3]);
-
-  // 腕（上腕＋前腕）
-  [-1, 1].forEach((s) => {
-    add('腕', new THREE.CapsuleGeometry(.185, .62, 5, 16), [.84 * s, 1.92, 0], [0, 0, .13 * s]);
-    add('腕', new THREE.CapsuleGeometry(.15,  .58, 5, 16), [.99 * s, 1.14, 0], [0, 0, .09 * s]);
-    addNeutral(new THREE.SphereGeometry(.15, 14, 12), [1.07 * s, .74, 0]);   // 手
+  const neutralMat = new THREE.MeshPhysicalMaterial({
+    color: 0x2a3348, metalness: .06, roughness: .6, clearcoat: .1
   });
 
-  // 脚（腿＋ふくらはぎ）
-  [-1, 1].forEach((s) => {
-    add('脚', new THREE.CapsuleGeometry(.26, .78, 5, 16), [.3 * s, .22, 0]);
-    add('脚', new THREE.CapsuleGeometry(.2,  .68, 5, 16), [.3 * s, -.78, 0]);
-    addNeutral(new THREE.BoxGeometry(.26, .14, .56), [.3 * s, -1.34, .1]);   // 足
+  const targets = [];
+  const place = (part, geo, { mirror = false } = {}) => {
+    const g = groups[part];
+    const m = new THREE.Mesh(geo, g.userData.mat);
+    if (mirror) m.scale.x = -1;
+    m.userData.part = part;
+    g.add(m);
+    targets.push(m);
+  };
+
+  SIDE_MUSCLES.forEach(({ part, sections, shape }) => {
+    const geo = loft(sections, { shape });
+    place(part, geo);
+    place(part, geo, { mirror: true });
+  });
+  CENTER_MUSCLES.forEach(({ part, sections, shape }) => place(part, loft(sections, { shape })));
+
+  SIDE_BLOBS.forEach(([part, p, s]) => {
+    [1, -1].forEach((side) => {
+      const g = groups[part];
+      const m = new THREE.Mesh(blob(), g.userData.mat);
+      m.position.set(p[0] * side, p[1], p[2]);
+      m.scale.set(...s);
+      m.userData.part = part;
+      g.add(m);
+      targets.push(m);
+    });
+  });
+
+  NEUTRAL_LOFTS.forEach((sections) => {
+    const geo = loft(sections);
+    const mirrored = sections.some((s) => s.p[0] !== 0);
+    const m = new THREE.Mesh(geo, neutralMat);
+    figure.add(m);
+    if (mirrored) {
+      const m2 = new THREE.Mesh(geo, neutralMat);
+      m2.scale.x = -1;
+      figure.add(m2);
+    }
+  });
+  NEUTRAL_BLOBS.forEach(([p, s]) => {
+    [1, -1].forEach((side) => {
+      if (p[0] === 0 && side === -1) return;
+      const m = new THREE.Mesh(blob(), neutralMat);
+      m.position.set(p[0] * side, p[1], p[2]);
+      m.scale.set(...s);
+      figure.add(m);
+    });
   });
 
   // 足元の光だまり
-  const pool = bloom(CYAN, 3.4, .22);
-  pool.position.set(0, -1.5, -.4);
+  const pool = bloom(CYAN, 5.2, .2);
+  pool.position.set(0, -3.6, -.4);
   scene.add(pool);
 
   /* --- 当たり判定と操作 ------------------------------------------------ */
   const ray = new THREE.Raycaster();
   const ptr = new THREE.Vector2();
-  const targets = [];
-  Object.values(groups).forEach((g) => g.children.forEach((m) => targets.push(m)));
-
   const selected = new Set(['胸']);
   let hovered = null;
 
@@ -327,7 +543,7 @@ export function mountBody(canvas, onChange) {
     hovered = dragging ? null : pick(ev);
   };
   const onUp = (ev) => {
-    if (dragging && moved < 6) {                  // 動かしていなければ「タップ」
+    if (dragging && moved < 6) {
       const p = pick(ev);
       if (p) {
         selected.has(p) ? selected.delete(p) : selected.add(p);
@@ -343,26 +559,24 @@ export function mountBody(canvas, onChange) {
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointerleave', onLeave);
 
+  const COL_OFF = new THREE.Color(0x343f57);
+  const COL_ON  = new THREE.Color(0x6ea31e);
+
   const stop = runWhenVisible(canvas, (dt, t) => {
     fit(renderer, camera);
 
-    // 触っていないあいだはゆっくり回り続ける
-    if (!dragging) spinV += (0.0028 - spinV) * .03;
+    if (!dragging) spinV += (0.0026 - spinV) * .03;
     spin += spinV;
     spinV *= .92;
     figure.rotation.y = spin;
-    figure.position.y = -.2 + Math.sin(t * .7) * .045;
+    figure.position.y = -3.72 + Math.sin(t * .7) * .05;
 
-    // 選択・ホバーに応じて発光を近づける（カクつかないよう補間）
     Object.values(groups).forEach((g) => {
       const d = g.userData;
-      const want = d.selected ? 1 : (hovered === d.part ? .42 : 0);
-      d.selected = selected.has(d.part);
+      const want = selected.has(d.part) ? 1 : (hovered === d.part ? .4 : 0);
       d.level += (want - d.level) * .14;
-      d.mat.emissiveIntensity = d.level * .5;
-      d.mat.color.lerpColors(new THREE.Color(0x2b3648), new THREE.Color(0x5f8f1a), d.level);
-      const s = 1 + d.level * .045;
-      g.scale.setScalar(s);
+      d.mat.emissiveIntensity = d.level * .55;
+      d.mat.color.lerpColors(COL_OFF, COL_ON, d.level);
     });
 
     renderer.render(scene, camera);
@@ -371,7 +585,6 @@ export function mountBody(canvas, onChange) {
   onChange?.([...selected]);
 
   return {
-    /** チップ側から選択を変えたときに呼ぶ */
     setSelection(list) { selected.clear(); list.forEach((p) => selected.add(p)); },
     dispose() {
       canvas.removeEventListener('pointerdown', onDown);
