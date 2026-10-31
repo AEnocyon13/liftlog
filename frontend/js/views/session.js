@@ -9,6 +9,7 @@ import * as gcal from '../googleCalendar.js';
 import { navigate } from '../router.js';
 import { resetPicking } from './select.js';
 import { restTimerHtml, startTicking, stopTicking, handleRestClick } from '../restTimer.js';
+import { mountBurst, effectsOn } from '../scenes.js';
 
 let elapsedId = null;
 
@@ -305,6 +306,20 @@ function renumber(entry) {
   entry.sets.forEach((s) => { if (!s.isWarmup) s.setNo = n++; });
 }
 
+/**
+ * 完了の演出。プレートが弾けて衝撃波が広がる。
+ * 毎回見るものなので3秒で消し、終わったら canvas ごと片付ける。
+ */
+function celebrate() {
+  if (!effectsOn()) return;
+  const cv = document.createElement('canvas');
+  cv.className = 'll-fx';
+  document.body.appendChild(cv);
+  const burst = mountBurst(cv);
+  burst.fire();
+  setTimeout(() => { burst.dispose(); cv.remove(); }, 3600);
+}
+
 async function finish(root) {
   const draft = state.draft;
   const workout = state.workout;            // state.workout は保存後に null にするので控える
@@ -344,6 +359,7 @@ async function finish(root) {
     resetPicking();
     state.workout = null;
     state.dashboard = await db.dashboard(state.profile.id);
+    celebrate();
     snackbar(`${res.savedSets}セット / ${fmtVolume(res.totalVolume)} を記録しました`, 'ok');
     navigate('/dashboard');
 

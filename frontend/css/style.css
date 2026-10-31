@@ -1,73 +1,98 @@
 /* ==========================================================================
-   LiftLog — Material Design 3
-   https://m3.material.io/
+   LiftLog — ダーク × ネオン（Material Design 3 のトークン構造の上に載せている）
 
-   シード色（ユーザー指定）
-     背景 #FFEFB3 … CREAM パレットの T94
-     文字 #013E37 … TEAL  パレットの T22
-   この2色から M3 のトーナルパレットを生成し、ライト/ダークで役割を反転させている。
-     ライト: surface = CREAM,  on-surface = TEAL
-     ダーク: surface = TEAL,   on-surface = CREAM
+   ジムは暗い。だから下地はほぼ黒にし、いま必要な数字だけをネオンで光らせる。
+   色には役割を1つずつ割り当てていて、見た瞬間に意味が読めるようにしている。
+     ライム   いま・達成
+     シアン   過去・情報
+     マゼンタ 自己ベスト
+     アンバー 休憩
+
+   明るいテーマでは、塗りのネオンはそのまま残し、
+   線と文字だけ暗い対比色に置き換える（白地の上でネオンの線は読めないため）。
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
    1. デザイントークン
    -------------------------------------------------------------------------- */
 :root {
-  /* --- Reference: tonal palettes ------------------------------------- */
-  --md-ref-teal-0:   #000100;  --md-ref-teal-10:  #00201C;  --md-ref-teal-12:  #002520;
-  --md-ref-teal-15:  #002C26;  --md-ref-teal-17:  #00302A;  --md-ref-teal-20:  #003831;
-  --md-ref-teal-22:  #013E37;  --md-ref-teal-24:  #05413A;  --md-ref-teal-25:  #08433C;
-  --md-ref-teal-30:  #184F47;  --md-ref-teal-35:  #265B53;  --md-ref-teal-40:  #32675F;
-  --md-ref-teal-50:  #4C8078;  --md-ref-teal-60:  #659B91;  --md-ref-teal-70:  #7FB5AC;
-  --md-ref-teal-80:  #9AD1C7;  --md-ref-teal-90:  #B5EEE3;  --md-ref-teal-100: #FFFFFF;
+  /* --- 参照パレット ---------------------------------------------------- */
+  --ll-lime-30: #253A00;  --ll-lime-40: #36560A;  --ll-lime-50: #4C7A00;
+  --ll-lime-60: #5F8F1A;  --ll-lime-70: #8FC424;  --ll-lime-80: #A8E02E;
+  --ll-lime-90: #C8FF3D;  --ll-lime-95: #DDFF8C;  --ll-lime-98: #F2FFD2;
 
-  --md-ref-cream-0:  #010000;  --md-ref-cream-10: #211B00;  --md-ref-cream-20: #373100;
-  --md-ref-cream-30: #4F4713;  --md-ref-cream-35: #5C531F;  --md-ref-cream-40: #695F2A;
-  --md-ref-cream-50: #837741;  --md-ref-cream-60: #9D9159;  --md-ref-cream-70: #B9AB72;
-  --md-ref-cream-75: #C7B97F;  --md-ref-cream-80: #D5C68C;  --md-ref-cream-85: #E4D49A;
-  --md-ref-cream-88: #ECDDA2;  --md-ref-cream-90: #F2E2A7;  --md-ref-cream-92: #F8E8AC;
-  --md-ref-cream-94: #FFEFB3;  --md-ref-cream-96: #FFF3CD;  --md-ref-cream-98: #FFF9E8;
-  --md-ref-cream-100:#FFFFFF;
+  --ll-cyan-20: #002C38;  --ll-cyan-40: #00647F;  --ll-cyan-60: #1FA8C8;
+  --ll-cyan-80: #2EE6FF;  --ll-cyan-90: #8FF1FF;  --ll-cyan-95: #C9F7FF;
 
-  /* --- System: color roles（ライト） ---------------------------------- */
-  --md-sys-color-primary:              var(--md-ref-teal-22);
-  --md-sys-color-on-primary:           var(--md-ref-cream-94);
-  --md-sys-color-primary-container:    var(--md-ref-cream-80);
-  --md-sys-color-on-primary-container: var(--md-ref-teal-15);
-  --md-sys-color-secondary:            var(--md-ref-teal-35);
-  --md-sys-color-on-secondary:         var(--md-ref-cream-96);
-  --md-sys-color-secondary-container:  var(--md-ref-cream-85);
-  --md-sys-color-on-secondary-container: var(--md-ref-teal-17);
-  --md-sys-color-tertiary:             var(--md-ref-cream-35);
-  --md-sys-color-on-tertiary:          var(--md-ref-cream-98);
-  --md-sys-color-tertiary-container:   var(--md-ref-cream-88);
-  --md-sys-color-on-tertiary-container: var(--md-ref-cream-10);
+  --ll-mag-20:  #3D0022;  --ll-mag-40:  #B0005F;  --ll-mag-60:  #E0197E;
+  --ll-mag-80:  #FF2E92;  --ll-mag-90:  #FFC2DD;
+
+  --ll-amber-40:#7A5200;  --ll-amber-60:#C98400;  --ll-amber-80:#FFB02E;
+  --ll-amber-90:#FFD694;
+
+  /* 無彩色。わずかに青を含ませて冷たくする */
+  --ll-n-04: #06070A;  --ll-n-06: #0A0C11;  --ll-n-08: #0E1117;  --ll-n-10: #11141B;
+  --ll-n-14: #171B25;  --ll-n-18: #1F2531;  --ll-n-24: #272E3C;  --ll-n-32: #3A4354;
+  --ll-n-50: #5F6878;  --ll-n-62: #7C8699;  --ll-n-70: #9AA4B8;  --ll-n-86: #CDD4DF;
+  --ll-n-90: #DFE4ED;  --ll-n-93: #E7EBF2;  --ll-n-95: #E9EEF7;  --ll-n-96: #EEF1F7;
+  --ll-n-97: #F3F5FA;  --ll-n-99: #FAFBFD;  --ll-n-100:#FFFFFF;
+
+  /* --- 役割の色（明るいテーマ） ----------------------------------------- */
+  /* 主ボタンは「黒い錠剤にネオンの文字」。白地でもブランドの対が残る */
+  --md-sys-color-primary:              var(--ll-n-10);
+  --md-sys-color-on-primary:           var(--ll-lime-90);
+  --md-sys-color-primary-container:    var(--ll-lime-95);
+  --md-sys-color-on-primary-container: var(--ll-lime-30);
+  --md-sys-color-secondary:            var(--ll-cyan-40);
+  --md-sys-color-on-secondary:         var(--ll-n-100);
+  --md-sys-color-secondary-container:  var(--ll-cyan-95);
+  --md-sys-color-on-secondary-container: var(--ll-cyan-20);
+  --md-sys-color-tertiary:             var(--ll-mag-40);
+  --md-sys-color-on-tertiary:          var(--ll-n-100);
+  --md-sys-color-tertiary-container:   var(--ll-mag-90);
+  --md-sys-color-on-tertiary-container: var(--ll-mag-20);
 
   --md-sys-color-error:                #BA1A1A;
   --md-sys-color-on-error:             #FFFFFF;
   --md-sys-color-error-container:      #FFDAD6;
   --md-sys-color-on-error-container:   #410002;
 
-  --md-sys-color-surface:              var(--md-ref-cream-94);
-  --md-sys-color-on-surface:           var(--md-ref-teal-22);
-  --md-sys-color-surface-variant:      var(--md-ref-cream-90);
-  --md-sys-color-on-surface-variant:   var(--md-ref-teal-35);
-  --md-sys-color-surface-dim:          var(--md-ref-cream-88);
-  --md-sys-color-surface-bright:       var(--md-ref-cream-98);
-  --md-sys-color-surface-container-lowest:  var(--md-ref-cream-98);
-  --md-sys-color-surface-container-low:     var(--md-ref-cream-96);
-  --md-sys-color-surface-container:         var(--md-ref-cream-92);
-  --md-sys-color-surface-container-high:    var(--md-ref-cream-90);
-  --md-sys-color-surface-container-highest: var(--md-ref-cream-88);
+  --md-sys-color-surface:              var(--ll-n-97);
+  --md-sys-color-on-surface:           var(--ll-n-10);
+  --md-sys-color-surface-variant:      var(--ll-n-93);
+  --md-sys-color-on-surface-variant:   #4A5464;
+  --md-sys-color-surface-dim:          var(--ll-n-90);
+  --md-sys-color-surface-bright:       var(--ll-n-100);
+  --md-sys-color-surface-container-lowest:  var(--ll-n-100);
+  --md-sys-color-surface-container-low:     var(--ll-n-99);
+  --md-sys-color-surface-container:         var(--ll-n-96);
+  --md-sys-color-surface-container-high:    var(--ll-n-93);
+  --md-sys-color-surface-container-highest: var(--ll-n-90);
 
-  --md-sys-color-outline:              var(--md-ref-cream-50);
-  --md-sys-color-outline-variant:      var(--md-ref-cream-80);
-  --md-sys-color-inverse-surface:      var(--md-ref-teal-22);
-  --md-sys-color-inverse-on-surface:   var(--md-ref-cream-94);
-  --md-sys-color-inverse-primary:      var(--md-ref-teal-80);
+  --md-sys-color-outline:              var(--ll-n-62);
+  --md-sys-color-outline-variant:      var(--ll-n-86);
+  --md-sys-color-inverse-surface:      var(--ll-n-10);
+  --md-sys-color-inverse-on-surface:   var(--ll-n-95);
+  --md-sys-color-inverse-primary:      var(--ll-lime-90);
   --md-sys-color-scrim:                #000000;
   --md-sys-color-shadow:               #000000;
+
+  --ll-accent:      var(--ll-lime-90);
+  --ll-accent-ink:  #1B2A00;
+  --ll-accent-line: var(--ll-lime-50);
+  --ll-info:        var(--ll-cyan-60);
+  --ll-info-line:   var(--ll-cyan-40);
+  --ll-pr:          var(--ll-mag-60);
+  --ll-pr-line:     var(--ll-mag-40);
+  --ll-rest:        var(--ll-amber-60);
+  --ll-rest-line:   var(--ll-amber-40);
+
+  /* 白地ではネオンが滲まないので、柔らかい影に置き換える */
+  --ll-glow:        0 2px 12px -2px rgb(95 143 26 / .45);
+  --ll-glow-info:   0 2px 12px -2px rgb(0 100 127 / .35);
+  --ll-glow-text:   none;
+  --ll-glow-line:   none;
+  --ll-grain:       0;
 
   /* 状態レイヤーの不透明度（M3規定値） */
   --md-sys-state-hover-opacity:    0.08;
@@ -77,7 +102,7 @@
   --md-sys-state-disabled-content: 0.38;
   --md-sys-state-disabled-container: 0.12;
 
-  /* --- System: shape ------------------------------------------------- */
+  /* --- 形 --------------------------------------------------------------- */
   --md-sys-shape-corner-none:        0px;
   --md-sys-shape-corner-extra-small: 4px;
   --md-sys-shape-corner-small:       8px;
@@ -86,7 +111,7 @@
   --md-sys-shape-corner-extra-large:28px;
   --md-sys-shape-corner-full:     9999px;
 
-  /* --- System: elevation --------------------------------------------- */
+  /* --- 高さ（影） -------------------------------------------------------- */
   --md-sys-elevation-0: none;
   --md-sys-elevation-1: 0 1px 2px 0 rgb(0 0 0 / .30), 0 1px 3px 1px rgb(0 0 0 / .15);
   --md-sys-elevation-2: 0 1px 2px 0 rgb(0 0 0 / .30), 0 2px 6px 2px rgb(0 0 0 / .15);
@@ -94,7 +119,7 @@
   --md-sys-elevation-4: 0 2px 3px 0 rgb(0 0 0 / .30), 0 6px 10px 4px rgb(0 0 0 / .15);
   --md-sys-elevation-5: 0 4px 4px 0 rgb(0 0 0 / .30), 0 8px 12px 6px rgb(0 0 0 / .15);
 
-  /* --- System: motion ------------------------------------------------ */
+  /* --- 動き ------------------------------------------------------------- */
   --md-sys-motion-easing-standard:            cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-emphasized:          cubic-bezier(0.2, 0, 0, 1);
   --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
@@ -102,103 +127,141 @@
   --md-sys-motion-duration-medium2: 300ms;
   --md-sys-motion-duration-long2:   500ms;
 
-  /* --- System: typography -------------------------------------------- */
-  --md-sys-typescale-brand: "Roboto", "Noto Sans JP", -apple-system, BlinkMacSystemFont,
-                            "Hiragino Sans", "Yu Gothic", sans-serif;
+  /* --- 書体 ------------------------------------------------------------- */
+  --md-sys-typescale-brand: "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont,
+                            "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   --md-sys-typescale-plain: var(--md-sys-typescale-brand);
+  /* 数字と見出しは圧縮した書体。重量計の表示に寄せる */
+  --ll-font-num: "Saira Condensed", var(--md-sys-typescale-brand);
 
-  /* --- レイアウト ------------------------------------------------------ */
-  --ll-nav-height: 80px;      /* M3 Navigation bar = 80dp */
-  --ll-bar-height: 64px;      /* M3 Top app bar (small) = 64dp */
+  /* --- レイアウト --------------------------------------------------------- */
+  --ll-nav-height: 80px;
+  --ll-bar-height: 64px;
   --ll-gutter: 16px;
 
   color-scheme: light;
 }
 
-/* --- ダーク: ユーザー指定どおり背景(#FFEFB3)と文字(#013E37)を入れ替える ---
-   data-theme="light" / "dark" は手動選択、"system"（既定）は OS 設定に追従する。 */
+/* data-theme="light" / "dark" は手動選択、"system"（既定）は OS 設定に追従する */
 :root[data-theme="dark"] { color-scheme: dark; }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"], :root:not([data-theme]) { color-scheme: dark; }
 }
 
 :root[data-theme="dark"] {
-  --md-sys-color-primary:              var(--md-ref-cream-94);
-  --md-sys-color-on-primary:           var(--md-ref-teal-22);
-  --md-sys-color-primary-container:    var(--md-ref-teal-30);
-  --md-sys-color-on-primary-container: var(--md-ref-cream-90);
-  --md-sys-color-secondary:            var(--md-ref-cream-85);
-  --md-sys-color-on-secondary:         var(--md-ref-teal-20);
-  --md-sys-color-secondary-container:  var(--md-ref-teal-35);
-  --md-sys-color-on-secondary-container: var(--md-ref-cream-90);
-  --md-sys-color-tertiary:             var(--md-ref-cream-80);
-  --md-sys-color-on-tertiary:          var(--md-ref-cream-20);
-  --md-sys-color-tertiary-container:   var(--md-ref-cream-30);
-  --md-sys-color-on-tertiary-container: var(--md-ref-cream-90);
+  /* ネオンは暗い地の上でしか成立しない。ここが本来の姿 */
+  --md-sys-color-primary:              var(--ll-lime-90);
+  --md-sys-color-on-primary:           #0A1200;
+  --md-sys-color-primary-container:    var(--ll-lime-30);
+  --md-sys-color-on-primary-container: var(--ll-lime-95);
+  --md-sys-color-secondary:            var(--ll-cyan-80);
+  --md-sys-color-on-secondary:         var(--ll-cyan-20);
+  --md-sys-color-secondary-container:  #06313C;
+  --md-sys-color-on-secondary-container: var(--ll-cyan-90);
+  --md-sys-color-tertiary:             var(--ll-mag-80);
+  --md-sys-color-on-tertiary:          var(--ll-mag-20);
+  --md-sys-color-tertiary-container:   #4D0029;
+  --md-sys-color-on-tertiary-container: var(--ll-mag-90);
 
-  --md-sys-color-error:                #FFB4AB;
-  --md-sys-color-on-error:             #690005;
-  --md-sys-color-error-container:      #93000A;
-  --md-sys-color-on-error-container:   #FFDAD6;
+  --md-sys-color-error:                #FF7D8C;
+  --md-sys-color-on-error:             #4A0008;
+  --md-sys-color-error-container:      #6E0011;
+  --md-sys-color-on-error-container:   #FFD9DC;
 
-  --md-sys-color-surface:              var(--md-ref-teal-22);
-  --md-sys-color-on-surface:           var(--md-ref-cream-94);
-  --md-sys-color-surface-variant:      var(--md-ref-teal-30);
-  --md-sys-color-on-surface-variant:   var(--md-ref-cream-80);
-  --md-sys-color-surface-dim:          var(--md-ref-teal-12);
-  --md-sys-color-surface-bright:       var(--md-ref-teal-35);
-  --md-sys-color-surface-container-lowest:  var(--md-ref-teal-10);
-  --md-sys-color-surface-container-low:     var(--md-ref-teal-17);
-  --md-sys-color-surface-container:         var(--md-ref-teal-24);
-  --md-sys-color-surface-container-high:    var(--md-ref-teal-30);
-  --md-sys-color-surface-container-highest: var(--md-ref-teal-35);
+  --md-sys-color-surface:              var(--ll-n-04);
+  --md-sys-color-on-surface:           var(--ll-n-95);
+  --md-sys-color-surface-variant:      var(--ll-n-18);
+  --md-sys-color-on-surface-variant:   var(--ll-n-70);
+  --md-sys-color-surface-dim:          var(--ll-n-04);
+  --md-sys-color-surface-bright:       var(--ll-n-24);
+  --md-sys-color-surface-container-lowest:  var(--ll-n-04);
+  --md-sys-color-surface-container-low:     var(--ll-n-08);
+  --md-sys-color-surface-container:         var(--ll-n-10);
+  --md-sys-color-surface-container-high:    var(--ll-n-14);
+  --md-sys-color-surface-container-highest: var(--ll-n-18);
 
-  --md-sys-color-outline:              var(--md-ref-teal-50);
-  --md-sys-color-outline-variant:      var(--md-ref-teal-30);
-  --md-sys-color-inverse-surface:      var(--md-ref-cream-94);
-  --md-sys-color-inverse-on-surface:   var(--md-ref-teal-22);
-  --md-sys-color-inverse-primary:      var(--md-ref-teal-30);
+  --md-sys-color-outline:              var(--ll-n-50);
+  --md-sys-color-outline-variant:      var(--ll-n-24);
+  --md-sys-color-inverse-surface:      var(--ll-n-95);
+  --md-sys-color-inverse-on-surface:   var(--ll-n-10);
+  --md-sys-color-inverse-primary:      var(--ll-lime-50);
+
+  /* 役割の色。塗りは両テーマで同じネオン、線と文字だけ地に合わせて変える */
+  --ll-accent:      var(--ll-lime-90);
+  --ll-accent-ink:  #0A1200;
+  --ll-accent-line: var(--ll-lime-90);
+  --ll-info:        var(--ll-cyan-80);
+  --ll-info-line:   var(--ll-cyan-80);
+  --ll-pr:          var(--ll-mag-80);
+  --ll-pr-line:     var(--ll-mag-80);
+  --ll-rest:        var(--ll-amber-80);
+  --ll-rest-line:   var(--ll-amber-80);
+
+  --ll-glow:        0 0 0 1px rgb(200 255 61 / .45), 0 0 28px -6px rgb(200 255 61 / .75);
+  --ll-glow-info:   0 0 0 1px rgb(46 230 255 / .40), 0 0 26px -6px rgb(46 230 255 / .65);
+  --ll-glow-text:   0 0 18px rgb(200 255 61 / .55);
+  --ll-glow-line:   drop-shadow(0 0 7px rgb(200 255 61 / .8));
+  --ll-grain:       .032;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"], :root:not([data-theme]) {
-    --md-sys-color-primary:              var(--md-ref-cream-94);
-    --md-sys-color-on-primary:           var(--md-ref-teal-22);
-    --md-sys-color-primary-container:    var(--md-ref-teal-30);
-    --md-sys-color-on-primary-container: var(--md-ref-cream-90);
-    --md-sys-color-secondary:            var(--md-ref-cream-85);
-    --md-sys-color-on-secondary:         var(--md-ref-teal-20);
-    --md-sys-color-secondary-container:  var(--md-ref-teal-35);
-    --md-sys-color-on-secondary-container: var(--md-ref-cream-90);
-    --md-sys-color-tertiary:             var(--md-ref-cream-80);
-    --md-sys-color-on-tertiary:          var(--md-ref-cream-20);
-    --md-sys-color-tertiary-container:   var(--md-ref-cream-30);
-    --md-sys-color-on-tertiary-container: var(--md-ref-cream-90);
-
-    --md-sys-color-error:                #FFB4AB;
-    --md-sys-color-on-error:             #690005;
-    --md-sys-color-error-container:      #93000A;
-    --md-sys-color-on-error-container:   #FFDAD6;
-
-    --md-sys-color-surface:              var(--md-ref-teal-22);
-    --md-sys-color-on-surface:           var(--md-ref-cream-94);
-    --md-sys-color-surface-variant:      var(--md-ref-teal-30);
-    --md-sys-color-on-surface-variant:   var(--md-ref-cream-80);
-    --md-sys-color-surface-dim:          var(--md-ref-teal-12);
-    --md-sys-color-surface-bright:       var(--md-ref-teal-35);
-    --md-sys-color-surface-container-lowest:  var(--md-ref-teal-10);
-    --md-sys-color-surface-container-low:     var(--md-ref-teal-17);
-    --md-sys-color-surface-container:         var(--md-ref-teal-24);
-    --md-sys-color-surface-container-high:    var(--md-ref-teal-30);
-    --md-sys-color-surface-container-highest: var(--md-ref-teal-35);
-
-    --md-sys-color-outline:              var(--md-ref-teal-50);
-    --md-sys-color-outline-variant:      var(--md-ref-teal-30);
-    --md-sys-color-inverse-surface:      var(--md-ref-cream-94);
-    --md-sys-color-inverse-on-surface:   var(--md-ref-teal-22);
-    --md-sys-color-inverse-primary:      var(--md-ref-teal-30);
+    /* ネオンは暗い地の上でしか成立しない。ここが本来の姿 */
+    --md-sys-color-primary:              var(--ll-lime-90);
+    --md-sys-color-on-primary:           #0A1200;
+    --md-sys-color-primary-container:    var(--ll-lime-30);
+    --md-sys-color-on-primary-container: var(--ll-lime-95);
+    --md-sys-color-secondary:            var(--ll-cyan-80);
+    --md-sys-color-on-secondary:         var(--ll-cyan-20);
+    --md-sys-color-secondary-container:  #06313C;
+    --md-sys-color-on-secondary-container: var(--ll-cyan-90);
+    --md-sys-color-tertiary:             var(--ll-mag-80);
+    --md-sys-color-on-tertiary:          var(--ll-mag-20);
+    --md-sys-color-tertiary-container:   #4D0029;
+    --md-sys-color-on-tertiary-container: var(--ll-mag-90);
+  
+    --md-sys-color-error:                #FF7D8C;
+    --md-sys-color-on-error:             #4A0008;
+    --md-sys-color-error-container:      #6E0011;
+    --md-sys-color-on-error-container:   #FFD9DC;
+  
+    --md-sys-color-surface:              var(--ll-n-04);
+    --md-sys-color-on-surface:           var(--ll-n-95);
+    --md-sys-color-surface-variant:      var(--ll-n-18);
+    --md-sys-color-on-surface-variant:   var(--ll-n-70);
+    --md-sys-color-surface-dim:          var(--ll-n-04);
+    --md-sys-color-surface-bright:       var(--ll-n-24);
+    --md-sys-color-surface-container-lowest:  var(--ll-n-04);
+    --md-sys-color-surface-container-low:     var(--ll-n-08);
+    --md-sys-color-surface-container:         var(--ll-n-10);
+    --md-sys-color-surface-container-high:    var(--ll-n-14);
+    --md-sys-color-surface-container-highest: var(--ll-n-18);
+  
+    --md-sys-color-outline:              var(--ll-n-50);
+    --md-sys-color-outline-variant:      var(--ll-n-24);
+    --md-sys-color-inverse-surface:      var(--ll-n-95);
+    --md-sys-color-inverse-on-surface:   var(--ll-n-10);
+    --md-sys-color-inverse-primary:      var(--ll-lime-50);
+  
+    /* 役割の色。塗りは両テーマで同じネオン、線と文字だけ地に合わせて変える */
+    --ll-accent:      var(--ll-lime-90);
+    --ll-accent-ink:  #0A1200;
+    --ll-accent-line: var(--ll-lime-90);
+    --ll-info:        var(--ll-cyan-80);
+    --ll-info-line:   var(--ll-cyan-80);
+    --ll-pr:          var(--ll-mag-80);
+    --ll-pr-line:     var(--ll-mag-80);
+    --ll-rest:        var(--ll-amber-80);
+    --ll-rest-line:   var(--ll-amber-80);
+  
+    --ll-glow:        0 0 0 1px rgb(200 255 61 / .45), 0 0 28px -6px rgb(200 255 61 / .75);
+    --ll-glow-info:   0 0 0 1px rgb(46 230 255 / .40), 0 0 26px -6px rgb(46 230 255 / .65);
+    --ll-glow-text:   0 0 18px rgb(200 255 61 / .55);
+    --ll-glow-line:   drop-shadow(0 0 7px rgb(200 255 61 / .8));
+    --ll-grain:       .032;
   }
 }
+
 
 /* --------------------------------------------------------------------------
    2. ベース
@@ -377,6 +440,12 @@ body { font-size: 14px; line-height: 20px; letter-spacing: .25px; }
   letter-spacing: .4px; opacity: .78; margin-top: 2px;
 }
 .md-fab-extended--tertiary { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+
+/* ワークアウト開始はこの画面の主役。塗りつぶしのネオンにする */
+.md-fab-extended:not(.md-fab-extended--tertiary) {
+  background: var(--ll-accent); color: var(--ll-accent-ink); font-weight: 700;
+}
+.md-fab-extended:not(.md-fab-extended--tertiary) .md-fab-extended__sub { opacity: .62; font-weight: 500; }
 
 /* Segmented button（M3 の連結ボタン） */
 .md-segmented { display: inline-flex; width: 100%; }
@@ -918,3 +987,152 @@ body.is-typing .ll-rest { position: static; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ==========================================================================
+   12. ネオンの層
+   トークンの入れ替えだけでは出ない「光り方」と「書体」をここで足す。
+   ========================================================================== */
+
+/* --- 書体：数字と見出しは圧縮した書体。日本語は Noto Sans JP に落ちる ----- */
+.md-display-large, .md-display-medium, .md-display-small,
+.md-headline-large, .md-headline-medium, .md-headline-small,
+.ll-timer, .ll-suggestion__weight, .ll-stat__value,
+.md-circular-progress__value, .ll-plan__weight, .ll-rest__clock,
+.ll-bars__value, .ll-set-row__no, .num {
+  font-family: var(--ll-font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.md-display-large, .md-display-medium, .md-display-small,
+.md-headline-large, .md-headline-medium, .md-headline-small {
+  font-weight: 700;
+  line-height: 1.08;
+}
+.md-display-large  { font-size: 54px; }
+.md-display-medium { font-size: 44px; }
+.md-headline-large { font-size: 34px; }
+.ll-timer, .ll-suggestion__weight, .ll-stat__value,
+.md-circular-progress__value, .ll-plan__weight { font-weight: 700; }
+
+/* 小見出しは「ラベル」に。全部大文字にはしない（日本語が混じるため） */
+.md-section-header {
+  font-family: var(--ll-font-num);
+  font-size: 12px; font-weight: 600; letter-spacing: .2em; line-height: 1.6;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* --- 粒子：のっぺりした黒を避ける（明るいテーマでは出さない） ------------- */
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  opacity: var(--ll-grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- 光り方 --------------------------------------------------------------- */
+.md-button--filled, .md-fab-extended { box-shadow: var(--ll-glow); }
+.md-button--filled:hover { box-shadow: var(--ll-glow), 0 0 32px -6px rgb(200 255 61 / .5); }
+.md-navigation-bar__item.is-active .icon { filter: var(--ll-glow-line); }
+.md-circular-progress__indicator { filter: var(--ll-glow-line); }
+.md-chip.is-selected { box-shadow: var(--ll-glow-info); }
+
+/* 上下のバーは半透明にして、背景の3Dを透かす */
+.md-top-app-bar, .md-navigation-bar {
+  background: color-mix(in srgb, var(--md-sys-color-surface) 86%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* --- 役割の色をそのまま出す ------------------------------------------------ */
+.ll-calendar__day--l1 { background: color-mix(in srgb, var(--ll-info) 20%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
+.ll-calendar__day--l2 { background: color-mix(in srgb, var(--ll-info) 40%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
+.ll-calendar__day--l3 { background: color-mix(in srgb, var(--ll-accent) 55%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
+.ll-calendar__day--l4 { background: var(--ll-accent); color: var(--ll-accent-ink); font-weight: 700; box-shadow: var(--ll-glow); }
+.ll-calendar__day--today { border-color: var(--ll-pr-line); }
+.ll-rest--running { border-color: var(--ll-rest-line); }
+.ll-rest--running .ll-rest__clock { color: var(--ll-rest-line); }
+.ll-suggestion__delta--up { color: var(--ll-accent-line); }
+.ll-set-row--warmup .ll-set-row__no { color: var(--ll-info-line); }
+
+/* ==========================================================================
+   13. 3D の置き場所
+   ========================================================================== */
+
+/* 背景として敷く canvas。操作の邪魔をしない */
+.ll-scene {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; z-index: 0; pointer-events: none;
+}
+/* 下へ行くほど暗くして、3Dの上でも文字が読めるようにする */
+.ll-scene-scrim {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--md-sys-color-surface) 0%, transparent) 0%,
+    color-mix(in srgb, var(--md-sys-color-surface) 25%, transparent) 32%,
+    color-mix(in srgb, var(--md-sys-color-surface) 75%, transparent) 56%,
+    color-mix(in srgb, var(--md-sys-color-surface) 95%, transparent) 76%,
+    var(--md-sys-color-surface) 92%);
+}
+.ll-hero {
+  position: relative;
+  margin: 0 calc(var(--ll-gutter) * -1) 4px;
+  padding: 0 var(--ll-gutter);
+  min-height: 268px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+/* 3D はアプリバーの裏まで伸ばす。そうしないと置物が収まらない */
+.ll-hero .ll-scene, .ll-hero .ll-scene-scrim {
+  top: calc(var(--ll-bar-height) * -1);
+  height: calc(100% + var(--ll-bar-height));
+}
+.ll-hero > *:not(.ll-scene):not(.ll-scene-scrim) { position: relative; z-index: 1; }
+
+/* 完了演出。画面全体にかぶせる */
+.ll-fx {
+  position: fixed; inset: 0; z-index: 120;
+  width: 100%; height: 100%; pointer-events: none;
+}
+
+/* 部位選択の人体 */
+.ll-pick-stage {
+  position: relative;
+  height: clamp(230px, 38vh, 360px);
+  margin: 0 calc(var(--ll-gutter) * -1) 4px;
+  touch-action: pan-y;
+}
+.ll-pick-stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; cursor: grab;
+}
+.ll-pick-stage canvas:active { cursor: grabbing; }
+.ll-pick-hint {
+  position: absolute; left: 0; right: 0; bottom: 2px; text-align: center;
+  font-size: 11px; color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+}
+
+/* レポートの立体の棒 */
+.ll-chart3d { position: relative; height: 190px; margin: 4px 0 2px; }
+.ll-chart3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ll-chart3d__axis {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: grid; font-size: 10px; text-align: center;
+  color: var(--md-sys-color-on-surface-variant); pointer-events: none;
+}
+
+/* 動きを減らす設定の端末では、3Dを出さない */
+@media (prefers-reduced-motion: reduce) {
+  .ll-scene, .ll-fx { display: none; }
+}
+
+/* 選んでいる部位はライム（＝いま）。情報のシアンと役割を混ぜない */
+.md-chip.is-selected {
+  background: color-mix(in srgb, var(--ll-accent) 16%, transparent);
+  border-color: var(--ll-accent-line);
+  color: var(--ll-accent-line);
+}
+
+/* 進捗は「達成」なのでライム。明るいテーマでは濃いライムに落ちる */
+.md-circular-progress__indicator { stroke: var(--ll-accent-line); }
+.md-linear-progress__indicator { background: var(--ll-accent-line); }
+.md-circular-progress__indicator--tertiary { stroke: var(--ll-pr-line); }
+.md-linear-progress__indicator--tertiary { background: var(--ll-pr-line); }

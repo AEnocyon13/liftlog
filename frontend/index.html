@@ -3,14 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FFEFB3" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#013E37" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F3F5FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#06070A" media="(prefers-color-scheme: dark)">
 <meta name="description" content="漸進性過負荷に基づいて重量を提案する筋トレ記録アプリ">
 <title>LiftLog — 筋トレ記録</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/style.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" } }
+</script>
 <script>
   /* テーマのちらつき防止：CSS適用前に保存済みの設定を反映する */
   try {
@@ -23,7 +26,21 @@
 
 <!-- Material Symbols 相当のアイコンを SVG スプライトとして内蔵（オフラインでも欠けない） -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
-  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M20.57 14.86 22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></symbol>
+  <defs>
+    <linearGradient id="ll-logo-g" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="var(--ll-info-line)"/><stop offset="1" stop-color="var(--ll-accent-line)"/>
+    </linearGradient>
+  </defs>
+  <!-- ロゴ：プレート（重り）の輪＋積み上がる記録の棒。輪は一周させず、伸びしろを残す -->
+  <symbol id="i-logo" viewBox="0 0 48 48">
+    <circle cx="24" cy="24" r="19" fill="none" stroke="url(#ll-logo-g)" stroke-width="3.6"
+            stroke-linecap="round" stroke-dasharray="104 15" transform="rotate(118 24 24)"/>
+    <g fill="currentColor">
+      <rect x="14.5" y="26"   width="5" height="8"    rx="2.1"/>
+      <rect x="21.5" y="21"   width="5" height="13"   rx="2.1"/>
+      <rect x="28.5" y="15.5" width="5" height="18.5" rx="2.1"/>
+    </g>
+  </symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></symbol>

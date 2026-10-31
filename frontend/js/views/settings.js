@@ -12,6 +12,11 @@ import { navigate } from '../router.js';
 import { bootstrap, paintNetState, loadCatalog } from '../app.js';
 import { reset as resetLogin } from './login.js';
 
+/** 3Dの演出を出す設定か。既定は入（scenes.js の effectsOn と同じ鍵を見る） */
+function effectsPref() {
+  try { return localStorage.getItem('liftlog.effects') !== 'off'; } catch { return true; }
+}
+
 let myEmail = null;
 
 export async function render(root) {
@@ -107,6 +112,21 @@ function paint(root) {
           <button class="md-segmented__item md-state ${t.value === theme ? 'is-selected' : ''}" data-theme="${t.value}">
             ${icon(t.icon, 'icon--sm')}${esc(t.label)}
           </button>`).join('')}
+      </div>
+
+      <div class="md-divider" style="margin:16px 0"></div>
+      <div class="ll-row ll-row--between">
+        <div class="ll-grow">
+          <div class="md-title-small">3Dの演出</div>
+          <p class="md-body-small on-surface-variant" style="margin:2px 0 0">
+            ホームの背景、部位選択の人体、完了時の演出、レポートの立体グラフ。
+            電池が気になるときは切ってください。
+          </p>
+        </div>
+        <label class="md-switch">
+          <input type="checkbox" id="fxSwitch" ${effectsPref() ? 'checked' : ''}>
+          <span class="md-switch__track"><span class="md-switch__thumb"></span></span>
+        </label>
       </div>
     </div>
 
@@ -281,6 +301,11 @@ const numField = (key, label, value, min, max, step, support = '') => `
 function bind(root) {
   root.querySelectorAll('.ll-pin').forEach((el) => {
     el.addEventListener('input', () => { el.value = auth.normalizePin(el.value); });
+  });
+
+  root.querySelector('#fxSwitch').addEventListener('change', (ev) => {
+    try { localStorage.setItem('liftlog.effects', ev.target.checked ? 'on' : 'off'); } catch { /* noop */ }
+    snackbar(ev.target.checked ? '3Dの演出を入れました' : '3Dの演出を切りました', 'ok');
   });
 
   root.querySelector('#themeSwitch').addEventListener('click', (ev) => {

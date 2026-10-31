@@ -21,11 +21,11 @@ import * as settings from './views/settings.js';
 
 defineRoutes({
   '/login':     { title: 'ログイン',       tab: '',          view: login.render,       requiresUser: false },
-  '/home':      { title: 'LiftLog',        tab: 'home',      view: home.render,        requiresUser: true },
-  '/select':    { title: 'メニュー選択',    tab: 'home',      view: select.render,      requiresUser: true, requiresAuth: true },
+  '/home':      { title: 'LiftLog',        tab: 'home',      view: home.render,        requiresUser: true, teardown: home.teardown },
+  '/select':    { title: 'メニュー選択',    tab: 'home',      view: select.render,      requiresUser: true, requiresAuth: true, teardown: select.dispose },
   '/confirm':   { title: '今回のプラン',    tab: 'home',      view: confirmView.render, requiresUser: true, requiresAuth: true },
   '/session':   { title: 'ワークアウト中',  tab: 'home',      view: session.render,     requiresUser: true, requiresAuth: true, teardown: session.teardown },
-  '/dashboard': { title: '月間レポート',    tab: 'dashboard', view: dashboard.render,   requiresUser: true },
+  '/dashboard': { title: '月間レポート',    tab: 'dashboard', view: dashboard.render,   requiresUser: true, teardown: dashboard.teardown },
   '/guides':    { title: '種目解説',        tab: 'guides',    view: guide.render,       requiresUser: false },
   '/settings':  { title: '設定',            tab: 'settings',  view: settings.render,    requiresUser: false }
 });

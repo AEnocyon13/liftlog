@@ -4,6 +4,14 @@ import * as db from '../db.js';
 import * as gcal from '../googleCalendar.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP,
          snackbar, emptyState, confirmDialog, openSheet } from '../ui.js';
+import { mountBars, effectsOn } from '../scenes.js';
+
+let disposeBars = null;
+
+export function teardown() {
+  disposeBars?.();
+  disposeBars = null;
+}
 
 let viewMonth = null;
 
@@ -156,20 +164,36 @@ function paint(root, d) {
 
     <h2 class="md-section-header">直近6ヶ月の推移</h2>
     <div class="md-card md-card--elevated">
-      <div class="ll-bars">
-        ${d.trend.map((m) => `
-          <div class="ll-bars__row">
-            <div class="ll-bars__label">${esc(m.month.replace('-', '/'))}</div>
-            ${linearProgress((m.volume / maxTrend) * 100, m.month === d.month ? '' : 'md-linear-progress__indicator--tertiary')}
-            <div class="ll-bars__value">${m.workouts}回</div>
-          </div>`).join('')}
-      </div>
+      ${effectsOn() ? `
+        <div class="ll-chart3d">
+          <canvas data-scene="bars"></canvas>
+          <div class="ll-chart3d__axis" id="barAxis"></div>
+        </div>` : `
+        <div class="ll-bars">
+          ${d.trend.map((m) => `
+            <div class="ll-bars__row">
+              <div class="ll-bars__label">${esc(m.month.replace('-', '/'))}</div>
+              ${linearProgress((m.volume / maxTrend) * 100, m.month === d.month ? '' : 'md-linear-progress__indicator--tertiary')}
+              <div class="ll-bars__value">${m.workouts}回</div>
+            </div>`).join('')}
+        </div>`}
     </div>
 
     <button class="md-button md-button--outlined md-button--block md-state" id="reloadDash" style="margin-top:16px">
       ${icon('refresh')}再集計する
     </button>
   `;
+
+  const barsCanvas = root.querySelector('[data-scene="bars"]');
+  if (barsCanvas) {
+    disposeBars?.();
+    const axis = root.querySelector('#barAxis');
+    axis.innerHTML = d.trend.map((m) => {
+      const now = m.month === d.month;
+      return `<span style="${now ? 'color:var(--ll-pr-line)' : ''}">${esc(m.month.slice(5).replace(/^0/, ''))}月</span>`;
+    }).join('');
+    disposeBars = mountBars(barsCanvas, d.trend.map((m) => m.volume), axis);
+  }
 
   // キーボード操作でも日付を開けるようにする
   root.addEventListener('keydown', (ev) => {

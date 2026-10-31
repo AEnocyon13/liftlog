@@ -6,15 +6,27 @@ import { showGuide } from './guide.js';
 import { openNewExerciseSheet } from './exercisePicker.js';
 import { navigate } from '../router.js';
 import { loadCatalog } from '../app.js';
+import { mountBody, effectsOn, BODY_PARTS } from '../scenes.js';
 
 let tidying = false;   // 「整理」モード中は、解説ボタンの代わりに非表示ボタンを出す
+let body = null;       // 3Dの人体。画面を離れるときに止める
 
 export function render(root) {
+  body?.dispose();
+  body = null;
+
   const parts = partsOf();
+  // 人体に載っている部位が1つでもあるときだけ3Dを出す
+  const show3d = effectsOn() && parts.some((p) => BODY_PARTS.includes(p));
   if (!state.picking.part && parts.length) state.picking.part = parts[0];
   const n = state.picking.selected.length;
 
   root.innerHTML = `
+    ${show3d ? `
+      <div class="ll-pick-stage">
+        <canvas data-scene="body"></canvas>
+        <p class="ll-pick-hint">ドラッグで回す ／ 鍛える部位をタップ</p>
+      </div>` : ''}
     <h2 class="md-section-header">部位</h2>
     <div class="md-chip-set" id="partRow">
       ${parts.map((p) => {
@@ -47,9 +59,23 @@ export function render(root) {
   root.querySelector('#partRow').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-part]');
     if (!btn) return;
-    state.picking.part = btn.dataset.part;
-    render(root);
+    applyPart(root, btn.dataset.part);
+    body?.setSelection([btn.dataset.part]);
   });
+
+  const stage = root.querySelector('[data-scene="body"]');
+  if (stage) {
+    body = mountBody(stage, ([part]) => {
+      if (!part) return;
+      if (!parts.includes(part)) {
+        snackbar(`${part}の種目がまだ登録されていません`, 'err');
+        body.setSelection([state.picking.part]);
+        return;
+      }
+      applyPart(root, part);
+    }, { single: true });
+    body.setSelection([state.picking.part]);
+  }
 
   root.querySelector('#menuList').addEventListener('click', async (e) => {
     const hide = e.target.closest('[data-hide]');
@@ -95,6 +121,22 @@ export function render(root) {
     newDraft(state.picking.selected.map((s) => ({ ...s })));
     navigate('/confirm');
   });
+}
+
+/**
+ * 部位を切り替える。画面ごと作り直すと3Dが止まってしまうので、
+ * チップとメニュー一覧だけを書き換える。
+ */
+function applyPart(root, part) {
+  if (!part || part === state.picking.part) return;
+  state.picking.part = part;
+  root.querySelectorAll('#partRow [data-part]').forEach((b) => {
+    const on = b.dataset.part === part;
+    b.classList.toggle('is-selected', on);
+    b.setAttribute('aria-pressed', String(on));
+    b.innerHTML = `${on ? icon('check', 'icon--sm') : ''}${esc(b.dataset.part)}`;
+  });
+  root.querySelector('#menuList').innerHTML = menuListHtml();
 }
 
 function menuListHtml() {
@@ -160,4 +202,10 @@ async function hideExercise(id, name, root) {
 
 export function resetPicking() {
   state.picking = { part: state.picking.part, selected: [] };
+}
+
+/** 画面を離れるときに3Dを止める */
+export function dispose() {
+  body?.dispose();
+  body = null;
 }
