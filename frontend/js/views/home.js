@@ -1,8 +1,9 @@
 /** home.js — ホーム（Extended FAB + 今月サマリ） */
 import { state, loadDraft, canEdit } from '../state.js';
 import { isConfigured } from '../config.js';
-import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtDateJP, emptyState } from '../ui.js';
+import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP, emptyState } from '../ui.js';
 import { mountHero, effectsOn } from '../scenes.js';
+import { plateStrip } from '../plates.js';
 
 /* 画面を離れるときに3Dを止める。放置すると電池を食う */
 let disposeHero = null;
@@ -42,10 +43,11 @@ export function render(root) {
   root.innerHTML = `
     <div class="ll-hero">
       ${effectsOn() ? '<canvas class="ll-scene" data-scene="hero"></canvas><div class="ll-scene-scrim"></div>' : ''}
-      <div class="ll-row ll-row--between" style="margin:4px 4px 12px">
-        <span class="md-title-medium">${esc(state.profile?.display_name || '')} さんの記録</span>
+      <div class="ll-row" style="justify-content:flex-end;margin:0 0 2px">
         <a class="md-chip md-chip--assist md-state" href="#/settings">${icon('person', 'icon--sm')}切り替え</a>
       </div>
+
+      ${nextLift(d)}
 
       ${canEdit() ? (active ? resumeFab(draft) : startFab()) : peekBanner()}
     </div>
@@ -57,25 +59,21 @@ export function render(root) {
           ${circularProgress(d.goal.achievementRate, `${d.goal.doneWorkouts} / ${d.goal.targetWorkouts} 回`,
                              d.goal.onTrack ? '' : 'md-circular-progress__indicator--tertiary')}
           <div class="ll-grow">
-            <div class="ll-row ll-row--between" style="margin-bottom:8px">
-              <span class="md-label-large on-surface-variant">ペース</span>
-              <span class="md-chip ${d.goal.onTrack ? 'md-chip--tonal' : 'md-chip--static'}" style="height:28px;padding:0 12px">
-                ${icon(d.goal.onTrack ? 'trending-up' : 'timer', 'icon--sm')}
-                ${d.goal.onTrack ? '順調' : '遅れ'} ${esc(d.goal.pace)}%
-              </span>
-            </div>
+            <div class="md-title-small" style="margin-bottom:6px">月間目標</div>
             <p class="md-body-small on-surface-variant" style="margin:0 0 12px">
-              今日時点の目安 ${esc(d.goal.expectedByToday)} 回 ／ 残り ${esc(d.goal.remaining)} 回
+              ${d.goal.onTrack
+                ? `今日時点の目安は ${esc(d.goal.expectedByToday)} 回。先行しています。`
+                : `今日時点の目安は ${esc(d.goal.expectedByToday)} 回。あと ${esc(Math.max(0, Math.ceil(d.goal.expectedByToday - d.goal.doneWorkouts)))} 回で追いつきます。`}
             </p>
             ${linearProgress(d.goal.achievementRate)}
           </div>
         </div>
       </div>
 
-      <div class="ll-stat-grid">
-        ${stat(fmtVolume(d.totals.volume), '総ボリューム')}
-        ${stat(d.totals.sets, '総セット')}
-        ${d.restDays === null ? stat('—', '最終から') : stat(d.restDays, '最終から', '日')}
+      <div class="ll-sheet">
+        <div class="ll-sheet__row"><span class="ll-sheet__k">総ボリューム</span><span class="ll-sheet__v">${fmtVolume(d.totals.volume)}</span></div>
+        <div class="ll-sheet__row"><span class="ll-sheet__k">総セット</span><span class="ll-sheet__v">${esc(d.totals.sets)}</span></div>
+        <div class="ll-sheet__row"><span class="ll-sheet__k">最後に鍛えてから</span><span class="ll-sheet__v">${d.restDays === null ? '—' : esc(d.restDays) + '<small>日</small>'}</span></div>
       </div>
 
       ${d.prs && d.prs.length ? `
@@ -99,6 +97,30 @@ export function render(root) {
 
   const hero = root.querySelector('[data-scene="hero"]');
   if (hero) disposeHero = mountHero(hero);
+}
+
+/**
+ * 次に持つ重さ。このアプリが存在する理由そのものなので、画面の頭に置く。
+ * 前回いちばん重かった種目に、設定の増分を足した重量を出す。
+ */
+function nextLift(d) {
+  const last = d?.lastMain;
+  if (!last || !last.weight) return '';
+  const step = Number(state.profile?.weight_increment) || 2.5;
+  const next = Math.round((last.weight + step) * 100) / 100;
+  const gear = state.exercises.find((e) => e.part === last.part && e.menu === last.menu);
+  const reps = (last.reps || []).filter((r) => r).join('/');
+
+  return `
+    <section class="ll-next">
+      <p class="ll-next__eyebrow">次に持つ重さ</p>
+      <p class="ll-next__menu">${esc(last.menu)}<span class="on-surface-variant" style="font-weight:400"> ／ ${esc(last.part)}</span></p>
+      <div class="ll-next__load">${fmtNum(next)}<small>kg</small></div>
+      ${plateStrip(next, gear?.equipment)}
+      <p class="ll-next__prev">
+        前回 ${fmtDateJP(last.date)}　${fmtNum(last.weight)}kg${reps ? ` × ${esc(reps)}` : ''}
+      </p>
+    </section>`;
 }
 
 const stat = (value, label, unit = '') => `

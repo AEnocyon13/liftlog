@@ -86,6 +86,8 @@
   --ll-pr-line:     var(--ll-mag-40);
   --ll-rest:        var(--ll-amber-60);
   --ll-rest-line:   var(--ll-amber-40);
+  --ll-rest-box:    var(--ll-amber-90);
+  --ll-rest-on-box: #3B2600;
 
   /* 白地ではネオンが滲まないので、柔らかい影に置き換える */
   --ll-glow:        0 2px 12px -2px rgb(95 143 26 / .45);
@@ -128,11 +130,12 @@
   --md-sys-motion-duration-long2:   500ms;
 
   /* --- 書体 ------------------------------------------------------------- */
-  --md-sys-typescale-brand: "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont,
+  /* 日本語の見出しにも表情を持たせる。Noto の素のままだと何も語らない */
+  --md-sys-typescale-brand: "Zen Kaku Gothic New", system-ui, -apple-system, BlinkMacSystemFont,
                             "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   --md-sys-typescale-plain: var(--md-sys-typescale-brand);
-  /* 数字と見出しは圧縮した書体。重量計の表示に寄せる */
-  --ll-font-num: "Saira Condensed", var(--md-sys-typescale-brand);
+  /* 数字は標識・器材の刻印に使われる書体。重量表示を「計器の読み」にする */
+  --ll-font-num: "Big Shoulders Display", "Zen Kaku Gothic New", sans-serif;
 
   /* --- レイアウト --------------------------------------------------------- */
   --ll-nav-height: 80px;
@@ -196,6 +199,8 @@
   --ll-pr-line:     var(--ll-mag-80);
   --ll-rest:        var(--ll-amber-80);
   --ll-rest-line:   var(--ll-amber-80);
+  --ll-rest-box:    #3B2600;
+  --ll-rest-on-box: var(--ll-amber-90);
 
   --ll-glow:        0 0 0 1px rgb(200 255 61 / .45), 0 0 28px -6px rgb(200 255 61 / .75);
   --ll-glow-info:   0 0 0 1px rgb(46 230 255 / .40), 0 0 26px -6px rgb(46 230 255 / .65);
@@ -253,6 +258,8 @@
     --ll-pr-line:     var(--ll-mag-80);
     --ll-rest:        var(--ll-amber-80);
     --ll-rest-line:   var(--ll-amber-80);
+    --ll-rest-box:    #3B2600;
+    --ll-rest-on-box: var(--ll-amber-90);
   
     --ll-glow:        0 0 0 1px rgb(200 255 61 / .45), 0 0 28px -6px rgb(200 255 61 / .75);
     --ll-glow-info:   0 0 0 1px rgb(46 230 255 / .40), 0 0 26px -6px rgb(46 230 255 / .65);
@@ -426,12 +433,12 @@ body { font-size: 14px; line-height: 20px; letter-spacing: .25px; }
 /* FAB / Extended FAB */
 .md-fab-extended {
   display: flex; align-items: center; justify-content: center; gap: 12px;
-  width: 100%; min-height: 72px; padding: 0 24px; border: none; cursor: pointer;
+  width: 100%; min-height: 62px; padding: 0 22px; border: none; cursor: pointer;
   border-radius: var(--md-sys-shape-corner-large);
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
   box-shadow: var(--md-sys-elevation-3);
-  font-size: 18px; line-height: 24px; font-weight: 500; letter-spacing: .1px;
+  font-size: 17px; line-height: 22px; font-weight: 700; letter-spacing: .01em;
   transition: box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
 .md-fab-extended:active { box-shadow: var(--md-sys-elevation-1); }
@@ -993,31 +1000,48 @@ body.is-typing .ll-rest { position: static; }
    トークンの入れ替えだけでは出ない「光り方」と「書体」をここで足す。
    ========================================================================== */
 
-/* --- 書体：数字と見出しは圧縮した書体。日本語は Noto Sans JP に落ちる ----- */
-.md-display-large, .md-display-medium, .md-display-small,
-.md-headline-large, .md-headline-medium, .md-headline-small,
-.ll-timer, .ll-suggestion__weight, .ll-stat__value,
-.md-circular-progress__value, .ll-plan__weight, .ll-rest__clock,
-.ll-bars__value, .ll-set-row__no, .num {
-  font-family: var(--ll-font-num);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: .01em;
-}
+/* --- 書体 ---------------------------------------------------------------
+   見出しは Zen Kaku Gothic New の 900。日本語でも字面が締まる。
+   数字は Big Shoulders Display。細く高いので、小さく使わず大きく使う。 */
 .md-display-large, .md-display-medium, .md-display-small,
 .md-headline-large, .md-headline-medium, .md-headline-small {
-  font-weight: 700;
-  line-height: 1.08;
+  font-family: var(--md-sys-typescale-brand);
+  font-weight: 900;
+  letter-spacing: -.015em;
+  line-height: 1.14;
 }
-.md-display-large  { font-size: 54px; }
-.md-display-medium { font-size: 44px; }
-.md-headline-large { font-size: 34px; }
-.ll-timer, .ll-suggestion__weight, .ll-stat__value,
-.md-circular-progress__value, .ll-plan__weight { font-weight: 700; }
+.md-display-large  { font-size: 44px; }
+.md-display-medium { font-size: 36px; }
+.md-display-small  { font-size: 30px; }
+.md-headline-large { font-size: 28px; }
+.md-headline-medium{ font-size: 24px; }
+.md-headline-small { font-size: 20px; }
+.md-title-large    { font-weight: 700; letter-spacing: -.005em; }
+.md-title-medium, .md-title-small { font-weight: 700; }
 
-/* 小見出しは「ラベル」に。全部大文字にはしない（日本語が混じるため） */
-.md-section-header {
+/* 数字。細い書体なので一段大きく、字間をわずかに開ける */
+.num, .ll-timer, .ll-suggestion__weight, .ll-stat__value,
+.md-circular-progress__value, .ll-plan__weight, .ll-plan__no,
+.ll-rest__clock, .ll-bars__value, .ll-set-row__no, .md-stepper__value,
+.ll-plan__reps, .ll-sheet__v {
   font-family: var(--ll-font-num);
-  font-size: 12px; font-weight: 600; letter-spacing: .2em; line-height: 1.6;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: .02em;
+}
+.ll-timer, .ll-suggestion__weight, .ll-stat__value,
+.md-circular-progress__value, .ll-sheet__v { font-weight: 800; }
+.ll-timer          { font-size: 64px; line-height: 1; }
+.ll-suggestion__weight { font-size: 58px; line-height: .96; }
+.ll-stat__value    { font-size: 34px; line-height: 1; }
+.ll-plan__weight   { font-size: 22px; }
+.md-stepper__value { font-size: 22px; }
+
+/* 小見出しはラベル扱い。本文と同じ書体のまま字間だけ開ける */
+.md-section-header {
+  font-family: var(--md-sys-typescale-brand);
+  font-size: 12px; font-weight: 700; letter-spacing: .18em; line-height: 1.6;
   color: var(--md-sys-color-on-surface-variant);
 }
 
@@ -1029,11 +1053,10 @@ body::after {
 }
 
 /* --- 光り方 --------------------------------------------------------------- */
-.md-button--filled, .md-fab-extended { box-shadow: var(--ll-glow); }
-.md-button--filled:hover { box-shadow: var(--ll-glow), 0 0 32px -6px rgb(200 255 61 / .5); }
-.md-navigation-bar__item.is-active .icon { filter: var(--ll-glow-line); }
-.md-circular-progress__indicator { filter: var(--ll-glow-line); }
-.md-chip.is-selected { box-shadow: var(--ll-glow-info); }
+/* 光らせるのは、その画面でいま押すべきもの一つだけ。
+   全部光ると、何も目立たなくなる。 */
+.md-fab-extended:not(.md-fab-extended--tertiary) { box-shadow: var(--ll-glow); }
+.md-button--filled { box-shadow: none; }
 
 /* 上下のバーは半透明にして、背景の3Dを透かす */
 .md-top-app-bar, .md-navigation-bar {
@@ -1046,8 +1069,9 @@ body::after {
 .ll-calendar__day--l1 { background: color-mix(in srgb, var(--ll-info) 20%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
 .ll-calendar__day--l2 { background: color-mix(in srgb, var(--ll-info) 40%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
 .ll-calendar__day--l3 { background: color-mix(in srgb, var(--ll-accent) 55%, var(--md-sys-color-surface-container)); color: var(--md-sys-color-on-surface); }
-.ll-calendar__day--l4 { background: var(--ll-accent); color: var(--ll-accent-ink); font-weight: 700; box-shadow: var(--ll-glow); }
-.ll-calendar__day--today { border-color: var(--ll-pr-line); }
+.ll-calendar__day--l4 { background: var(--ll-accent); color: var(--ll-accent-ink); font-weight: 700; }
+/* 今日は色ではなく枠で示す。色は「量」のために取っておく */
+.ll-calendar__day--today { border-color: var(--md-sys-color-on-surface); border-width: 1.5px; }
 .ll-rest--running { border-color: var(--ll-rest-line); }
 .ll-rest--running .ll-rest__clock { color: var(--ll-rest-line); }
 .ll-suggestion__delta--up { color: var(--ll-accent-line); }
@@ -1075,14 +1099,12 @@ body::after {
 .ll-hero {
   position: relative;
   margin: 0 calc(var(--ll-gutter) * -1) 4px;
-  padding: 0 var(--ll-gutter);
-  min-height: 268px;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 96px var(--ll-gutter) 0;
 }
-/* 3D はアプリバーの裏まで伸ばす。そうしないと置物が収まらない */
+/* 3D は見出しの「上の帯」に置く。文字と重ねると、どちらも読めなくなる */
 .ll-hero .ll-scene, .ll-hero .ll-scene-scrim {
   top: calc(var(--ll-bar-height) * -1);
-  height: calc(100% + var(--ll-bar-height));
+  height: calc(96px + var(--ll-bar-height) + 34px);
 }
 .ll-hero > *:not(.ll-scene):not(.ll-scene-scrim) { position: relative; z-index: 1; }
 
@@ -1134,5 +1156,107 @@ body::after {
 /* 進捗は「達成」なのでライム。明るいテーマでは濃いライムに落ちる */
 .md-circular-progress__indicator { stroke: var(--ll-accent-line); }
 .md-linear-progress__indicator { background: var(--ll-accent-line); }
-.md-circular-progress__indicator--tertiary { stroke: var(--ll-pr-line); }
-.md-linear-progress__indicator--tertiary { background: var(--ll-pr-line); }
+.md-circular-progress__indicator--tertiary { stroke: var(--ll-rest-line); }
+.md-linear-progress__indicator--tertiary { background: var(--ll-rest-line); }
+
+/* ==========================================================================
+   14. プレート表示 — このアプリの顔
+   重量の横に、実際にバーへ付けるプレートを国際規格の色で並べる。
+   ========================================================================== */
+.ll-plates {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 6px; min-width: 0;
+}
+.ll-plates__svg {
+  height: 26px; width: auto; flex: 0 0 auto;
+  fill: none;                      /* svg{fill:currentColor} の既定を打ち消す */
+}
+.ll-plates__text {
+  font-size: 11px; line-height: 1.4; letter-spacing: .02em;
+  color: var(--md-sys-color-on-surface-variant);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ll-plates--lg .ll-plates__svg { height: 38px; }
+.ll-plates--lg .ll-plates__text { font-size: 12px; }
+/* 一覧の中など、場所が狭いときは絵だけ */
+.ll-plates--bare .ll-plates__text { display: none; }
+.ll-plates--bare .ll-plates__svg { height: 18px; }
+
+/* ==========================================================================
+   15. 記録用紙（素材の第1階層）
+   数値は箱に入れない。紙に引いた罫線の上に置く。
+   カードだらけの画面に、素材の差をつくるための階層。
+   ========================================================================== */
+.ll-sheet { display: grid; margin: 4px 0 8px; }
+.ll-sheet__row {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  gap: 16px; padding: 11px 2px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+.ll-sheet__row:last-child { border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.ll-sheet__k {
+  font-size: 13px; color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ll-sheet__v { font-size: 26px; line-height: 1; white-space: nowrap; }
+.ll-sheet__v small {
+  font-family: var(--md-sys-typescale-brand);
+  font-size: 12px; font-weight: 500; letter-spacing: 0;
+  color: var(--md-sys-color-on-surface-variant); margin-left: 3px;
+}
+/* その画面で一番大事な行だけ、数字をライムにして大きくする */
+.ll-sheet__row--lead .ll-sheet__v { font-size: 38px; color: var(--ll-accent-line); }
+
+/* ==========================================================================
+   16. ホームの「次に持つ重さ」
+   ========================================================================== */
+.ll-next { padding: 0 0 18px; }
+.ll-next__eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .18em;
+  color: var(--md-sys-color-on-surface-variant); margin: 0 0 10px;
+}
+.ll-next__menu { font-size: 15px; font-weight: 700; margin: 0 0 2px; }
+.ll-next__load {
+  font-family: var(--ll-font-num); font-weight: 800; font-variant-numeric: tabular-nums;
+  font-size: 78px; line-height: .88; letter-spacing: .01em;
+  color: var(--ll-accent-line);
+}
+.ll-next__load small {
+  font-family: var(--md-sys-typescale-brand);
+  font-size: 20px; font-weight: 700; letter-spacing: 0; margin-left: 6px;
+  color: var(--md-sys-color-on-surface);
+}
+.ll-next__prev { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 10px 0 0; }
+.ll-next .ll-plates { margin-top: 12px; }
+
+/* 月の表示は押せるものではないので、タブのように見せない */
+.md-segmented__label {
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; cursor: default; background: transparent;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* 重量のステッパー。読む数字と触る数字を分けず、ここを主役にする */
+.md-stepper--hero { padding: 6px; gap: 4px; }
+.md-stepper--hero .md-stepper__value {
+  font-size: 46px; font-weight: 800; letter-spacing: .01em;
+  padding: 0 2px; text-align: right;
+}
+.md-stepper--hero .md-stepper__unit {
+  font-size: 15px; font-weight: 700; align-self: flex-end;
+  padding-bottom: 10px; margin-right: 6px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.md-stepper--hero .md-stepper__btn { width: 46px; height: 46px; }
+
+/* 経過時間は「状態の読み」であって、押すものではない。
+   ライムは押すもの（休憩開始・終了）に取っておく */
+.ll-timer { color: var(--md-sys-color-on-surface); }
+
+/* 実施中のワークアウトは「保留中のもの」。アンバーで示す。
+   マゼンタは自己ベストのために取っておく */
+.md-fab-extended--tertiary {
+  background: var(--ll-rest-box);
+  color: var(--ll-rest-on-box);
+  font-weight: 700;
+}

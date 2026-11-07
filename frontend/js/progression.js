@@ -33,6 +33,14 @@ const fmtKg = (v) => (Math.round(v * 100) % 100 === 0) ? String(Math.round(v)) :
  * @param {Object} conf      { part, name, repMin, repMax, defaultSets }
  * @param {number} increment 前回比で足す重量(kg)
  */
+/** 2026-11-05 → 11/5(木)。ISOの日付をそのまま画面に出さない */
+function jpDate(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if (!y) return String(iso);
+  const dt = new Date(y, m - 1, d);
+  return `${m}/${d}(${'日月火水木金土'[dt.getDay()]})`;
+}
+
 export function suggestNextLoad(history, conf, increment) {
   const inc = Number(increment) > 0 ? Number(increment) : 2.5;
   const repMin = Number(conf.repMin) || 8;
@@ -94,7 +102,7 @@ export function suggestNextLoad(history, conf, increment) {
       prevWeight: s.weight,
       prevReps: s.reps
     })),
-    reason: `前回 ${last.date} は ${fmtKg(W)}kg × ${reps.join('/')}レップ（${work.length}セット）でした。`
+    reason: `前回（${jpDate(last.date)}）は ${fmtKg(W)}kg × ${reps.join('/')}レップ、${work.length}セット。`
           + `セット数とレップはそのまま引き継ぎ、重量だけ +${fmtKg(inc)}kg した ${fmtKg(newWeight)}kg を`
           + `今回のプランにしています。きつい場合はこの画面で重量を下げてから開始してください。`
   };

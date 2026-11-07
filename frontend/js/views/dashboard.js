@@ -5,6 +5,7 @@ import * as gcal from '../googleCalendar.js';
 import { esc, icon, circularProgress, linearProgress, fmtVolume, fmtNum, fmtDateJP,
          snackbar, emptyState, confirmDialog, openSheet } from '../ui.js';
 import { mountBars, effectsOn } from '../scenes.js';
+import { plateStrip } from '../plates.js';
 
 let disposeBars = null;
 
@@ -46,7 +47,7 @@ function paint(root, d) {
   root.innerHTML = `
     <div class="md-segmented" style="margin:8px 0 16px">
       <button class="md-segmented__item md-state" data-nav="-1">${icon('back', 'icon--sm')}前月</button>
-      <button class="md-segmented__item md-state is-selected" disabled>${esc(d.monthLabel)}</button>
+      <span class="md-segmented__item md-segmented__label">${esc(d.monthLabel)}</span>
       <button class="md-segmented__item md-state" data-nav="1" ${isCurrentOrFuture(d.month) ? 'disabled' : ''}>翌月${icon('chevron', 'icon--sm')}</button>
     </div>
 
@@ -55,31 +56,27 @@ function paint(root, d) {
         ${circularProgress(g.achievementRate, `${g.doneWorkouts} / ${g.targetWorkouts} 回`,
                            g.onTrack ? '' : 'md-circular-progress__indicator--tertiary')}
         <div class="ll-grow">
-          <div class="md-card__title" style="margin-bottom:12px">月間目標の達成度</div>
-          ${kv('実施', `${g.doneWorkouts} 回`)}
-          ${kv('残り', `${g.remaining} 回`)}
-          ${kv('今日時点の目安', `${fmtNum(g.expectedByToday)} 回`)}
-          <span class="md-chip ${g.onTrack ? 'md-chip--tonal' : 'md-chip--static'}" style="margin-top:8px">
-            ${icon(g.onTrack ? 'trending-up' : 'timer', 'icon--sm')}${g.onTrack ? '順調' : '遅れ'} ${fmtNum(g.pace)}%
+          <div class="md-card__title" style="margin-bottom:8px">月間目標</div>
+          <p class="md-body-medium on-surface-variant" style="margin:0 0 10px">
+            ${g.onTrack
+              ? `今日時点の目安は ${fmtNum(g.expectedByToday)} 回。先行しています。`
+              : `今日時点の目安は ${fmtNum(g.expectedByToday)} 回。あと ${Math.max(1, Math.ceil(g.expectedByToday - g.doneWorkouts))} 回で追いつきます。`}
+          </p>
+          <span class="md-chip ${g.onTrack ? 'md-chip--tonal' : 'md-chip--static'}">
+            ${icon(g.onTrack ? 'trending-up' : 'timer', 'icon--sm')}残り ${g.remaining} 回
           </span>
         </div>
       </div>
-      ${g.targetVolume > 0 ? `
-        <hr class="md-divider">
-        <div class="ll-row ll-row--between md-body-medium" style="margin-bottom:8px">
-          <span class="on-surface-variant">総ボリューム目標</span>
-          <span class="num" style="font-weight:500">${fmtVolume(t.volume)} / ${fmtVolume(g.targetVolume)}（${fmtNum(g.volumeRate)}%）</span>
-        </div>
-        ${linearProgress(g.volumeRate, 'md-linear-progress__indicator--tertiary')}` : ''}
     </div>
 
-    <div class="ll-stat-grid">
-      ${stat(fmtVolume(t.volume), '総ボリューム')}
-      ${stat(t.sets, '総セット')}
-      ${stat(t.reps, '総レップ')}
-      ${stat(t.minutes, '総時間', '分')}
-      ${stat(fmtVolume(t.avgVolumePerSession), '1回平均')}
-      ${stat(t.avgMinutesPerSession, '平均時間', '分')}
+    <h2 class="md-section-header">今月の記録</h2>
+    <div class="ll-sheet">
+      ${sheetRow('総ボリューム', fmtVolume(t.volume), true)}
+      ${g.targetVolume > 0 ? sheetRow('目標まで', fmtVolume(Math.max(0, g.targetVolume - t.volume))) : ''}
+      ${sheetRow('セット', t.sets)}
+      ${sheetRow('レップ', t.reps)}
+      ${sheetRow('時間', `${t.minutes}<small>分</small>`)}
+      ${sheetRow('1回あたり', `${fmtVolume(t.avgVolumePerSession)} <small>／ ${t.avgMinutesPerSession}分</small>`)}
     </div>
 
     <h2 class="md-section-header">トレーニング日</h2>
@@ -228,6 +225,13 @@ function paint(root, d) {
   });
 }
 
+/** 記録用紙の1行。数字は箱ではなく罫線の上に置く */
+const sheetRow = (k, v, lead = false) => `
+  <div class="ll-sheet__row ${lead ? 'll-sheet__row--lead' : ''}">
+    <span class="ll-sheet__k">${esc(k)}</span>
+    <span class="ll-sheet__v">${v}</span>
+  </div>`;
+
 /** その日の内容をボトムシートで見せる */
 async function openDayDetail(date) {
   openSheet(`<h2 class="md-dialog__headline" id="sheetTitle">${fmtDateJP(date)}</h2>
@@ -268,6 +272,8 @@ function dayDetailHtml(d) {
           <span class="md-title-small">${esc(e.menu)}</span>
           <span class="md-body-small on-surface-variant">${esc(e.part)}</span>
         </div>
+        ${plateStrip(Math.max(...e.sets.filter((s2) => !s2.isWarmup).map((s2) => s2.weight), 0),
+                     state.exercises.find((x) => x.part === e.part && x.menu === e.menu)?.equipment)}
         <div class="ll-stack" style="gap:4px">
           ${e.sets.map((s2) => `
             <div class="ll-row ll-row--between md-body-medium">

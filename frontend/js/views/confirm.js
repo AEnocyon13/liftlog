@@ -4,6 +4,7 @@ import * as db from '../db.js';
 import { esc, icon, snackbar, fmtNum, fmtDateJP, emptyState } from '../ui.js';
 import { showGuide } from './guide.js';
 import { navigate } from '../router.js';
+import { plateStrip } from '../plates.js';
 
 const META = {
   carry_over: { cls: 'll-suggestion',                    chip: 'md-chip--tonal',  ico: 'trending-up' },
@@ -98,31 +99,30 @@ function planCard(e, i) {
         </div>
       </div>
 
-      <div class="ll-row ll-row--between" style="align-items:flex-end;margin-bottom:16px">
-        <div>
-          <div class="ll-suggestion__weight num">${e.weight === null ? '—' : fmtNum(e.weight)}<span> kg</span></div>
-          ${last
-            ? `<div class="ll-suggestion__delta ll-suggestion__delta--up">前回 ${fmtNum(last.weight)}kg から +${fmtNum(e.weight - last.weight)}kg</div>`
-            : `<div class="ll-suggestion__delta on-surface-variant">履歴なし・重量を入力してください</div>`}
-        </div>
-        <div style="text-align:right">
-          <div class="md-label-medium on-surface-variant" style="margin-bottom:4px">セット数</div>
-          <div class="ll-row" style="gap:4px;align-items:center;justify-content:flex-end">
-            <button class="md-icon-button md-state" data-act="setminus" aria-label="セットを減らす"
-                    style="width:36px;height:36px" ${e.plan.length <= 1 ? 'disabled' : ''}>${icon('remove', 'icon--sm')}</button>
-            <span class="num md-title-large" style="min-width:20px;text-align:center">${e.plan.length}</span>
-            <button class="md-icon-button md-state" data-act="setplus" aria-label="セットを増やす"
-                    style="width:36px;height:36px" ${e.plan.length >= 12 ? 'disabled' : ''}>${icon('add', 'icon--sm')}</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="md-stepper" style="margin-bottom:12px">
+      <!-- 重量は「読む数字」と「触る数字」を分けない。ひとつにまとめる -->
+      <div class="md-stepper md-stepper--hero">
         <button class="md-stepper__btn md-state" data-act="dec" aria-label="${step}kg 減らす">${icon('remove')}</button>
         <input class="md-stepper__value" type="number" inputmode="decimal" step="0.25"
                data-act="weight" value="${e.weight ?? ''}" placeholder="重量" aria-label="重量 kg">
+        <span class="md-stepper__unit">kg</span>
         <button class="md-stepper__btn md-state" data-act="inc" aria-label="${step}kg 増やす">${icon('add')}</button>
       </div>
+
+      <div class="ll-row ll-row--between" style="margin:8px 0 2px;gap:12px">
+        ${last
+          ? `<span class="ll-suggestion__delta ll-suggestion__delta--up">前回 ${fmtNum(last.weight)}kg から +${fmtNum(e.weight - last.weight)}kg</span>`
+          : `<span class="ll-suggestion__delta on-surface-variant">履歴なし・重量を入力してください</span>`}
+        <span class="ll-row" style="gap:6px;align-items:center;flex:0 0 auto">
+          <span class="md-body-small on-surface-variant">セット</span>
+          <button class="md-icon-button md-state" data-act="setminus" aria-label="セットを減らす"
+                  style="width:34px;height:34px" ${e.plan.length <= 1 ? 'disabled' : ''}>${icon('remove', 'icon--sm')}</button>
+          <span class="num md-title-large" style="min-width:18px;text-align:center">${e.plan.length}</span>
+          <button class="md-icon-button md-state" data-act="setplus" aria-label="セットを増やす"
+                  style="width:34px;height:34px" ${e.plan.length >= 12 ? 'disabled' : ''}>${icon('add', 'icon--sm')}</button>
+        </span>
+      </div>
+
+      <div data-plates="${i}">${plateStrip(e.weight, e.config?.equipment)}</div>
 
       <div class="ll-plan">
         ${e.plan.map((p, pi) => `

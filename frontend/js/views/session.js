@@ -10,6 +10,7 @@ import { navigate } from '../router.js';
 import { resetPicking } from './select.js';
 import { restTimerHtml, startTicking, stopTicking, handleRestClick } from '../restTimer.js';
 import { mountBurst, effectsOn } from '../scenes.js';
+import { plateStrip } from '../plates.js';
 
 let elapsedId = null;
 
@@ -146,6 +147,8 @@ function entryCard(e, ei) {
         </div>
         <button class="md-icon-button md-state" data-act="guide" aria-label="解説">${icon('info')}</button>
       </div>
+
+      ${plateStrip(e.weight, e.config?.equipment)}
 
       <div class="ll-set-head"><span>#</span><span>重量 kg</span><span>レップ</span><span>RPE</span><span></span></div>
       ${e.sets.map((s, si) => setRow(s, si)).join('')}

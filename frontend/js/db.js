@@ -450,6 +450,22 @@ export async function dashboard(userId, month) {
 
   const lastDate = daily.map((d) => d.date).sort().pop() || null;
 
+  /* 直近のワークアウトで一番重かったセット。ホームの「次に持つ重さ」の土台 */
+  const lastMain = (() => {
+    if (!lastDate) return null;
+    const sameDay = sets.filter((s2) => s2.date === lastDate);
+    if (!sameDay.length) return null;
+    const top = sameDay.slice().sort((a, b) => Number(b.weight) - Number(a.weight))[0];
+    const sameLift = sameDay.filter((s2) => s2.exercise === top.exercise)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return {
+      part: top.part, menu: top.exercise, date: lastDate,
+      weight: Number(top.weight),
+      reps: sameLift.map((s2) => s2.reps)
+    };
+  })();
+
+
   return {
     month: m,
     monthLabel: `${y}年${mo}月`,
@@ -469,7 +485,7 @@ export async function dashboard(userId, month) {
       avgVolumePerSession: done > 0 ? round1(totalVolume / done) : 0,
       avgMinutesPerSession: done > 0 ? Math.round(totalMinutes / done) : 0
     },
-    byPart, calendar, prs, topLifts, trend, recentWorkouts,
+    byPart, calendar, prs, topLifts, trend, recentWorkouts, lastMain,
     lastWorkoutDate: lastDate,
     restDays: lastDate ? Math.floor((dateOf(t) - dateOf(lastDate)) / 86400000) : null
   };
